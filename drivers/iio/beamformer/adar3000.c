@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: GPL-2.0 OR BSD-2-Clause
 /*
  * ADAR3000, ADAR3001, ADAR3002, ADAR3003 device driver
  *
@@ -496,4 +496,4 @@ module_spi_driver(adar3000_driver);
 
 MODULE_AUTHOR("Cristian Pop <cristian.pop@analog.com>");
 MODULE_DESCRIPTION("Analog Devices ADAR3000 Beamformer");
-MODULE_LICENSE("GPL v2");
+MODULE_LICENSE("Dual BSD/GPL");

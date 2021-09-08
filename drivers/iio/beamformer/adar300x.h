@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0-or-later */
+// SPDX-License-Identifier: GPL-2.0 OR BSD-2-Clause
 /*
  * header file for ADAV80X parts
  *
