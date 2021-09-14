@@ -6,11 +6,13 @@
  */
 
 #include <linux/bitfield.h>
-#include <linux/regmap.h>
+#include <linux/module.h>
 #include <linux/of_device.h>
+#include <linux/regmap.h>
 #include <linux/spi/spi.h>
+
+#include <linux/iio/buffer-dma.h>
 #include <linux/iio/sysfs.h>
-#include "adar300x.h"
 
 #define ADAR300x_REG_SPI_CONFIG			0x00
 #define ADAR300x_REG_1				0x01
@@ -157,6 +159,169 @@
 #define ADAR300x_MAX_PHASE_DEGREE	360
 #define ADAR300x_CHIP_TYPE		0x01
 #define ADAR300x_ADC_NUM_CLOCKS		7
+
+#define ADAR3000_PRODUCT_ID 0x01
+#define ADAR3003_PRODUCT_ID 0x00
+
+#define ADAR300x_BEAMS_PER_DEVICE	4
+#define ADAR300x_ELEMENTS_PER_BEAM	4
+#define ADAR300x_CHANNELS_PER_BEAM	8
+
+#define ADAR300x_DELAY_CH(_id, _num, name)			\
+{								\
+	.type = IIO_PHASE,					\
+	.output = true,						\
+	.indexed = true,					\
+	.channel = (_num),					\
+	.address = (_id),					\
+	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |		\
+			      BIT(IIO_CHAN_INFO_SCALE) |	\
+			      BIT(IIO_CHAN_INFO_LABEL),		\
+	.label_name = name,					\
+	.scan_index = (_id),					\
+	.scan_type = {						\
+		.sign = 'u',					\
+		.realbits = 6,					\
+		.storagebits = 8,				\
+		.shift = 0,					\
+	},							\
+}
+
+#define ADAR300x_ATTEN_CH(_id, _num, name)			\
+{								\
+	.type = IIO_POWER,					\
+	.indexed = true,					\
+	.output = true,						\
+	.channel = (_num),					\
+	.address = (_id),					\
+	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |		\
+			      BIT(IIO_CHAN_INFO_SCALE) |	\
+			      BIT(IIO_CHAN_INFO_LABEL),		\
+	.label_name = name,					\
+	.scan_index = (_id),					\
+	.scan_type = {						\
+		.sign = 'u',					\
+		.realbits = 6,					\
+		.storagebits = 8,				\
+		.shift = 0,					\
+	},							\
+}
+
+#define ADAR300x_TEMP(_id, _num, name)				\
+{								\
+	.type = IIO_TEMP,					\
+	.indexed = true,					\
+	.channel = (_num),					\
+	.address = (_id),					\
+	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |		\
+			      BIT(IIO_CHAN_INFO_OFFSET) |	\
+			      BIT(IIO_CHAN_INFO_SCALE),		\
+	.scan_index = (_id),					\
+	.scan_type = {						\
+		.sign = 'u',					\
+		.realbits = 8,					\
+		.storagebits = 8,				\
+		.shift = 0,					\
+	},							\
+}
+
+enum adar300x_ids {
+	ID_ADAR3000,
+	ID_ADAR3001,
+	ID_ADAR3002,
+	ID_ADAR3003,
+};
+
+enum adar300x_iio_ram_ptrs {
+	ADAR300x_PTR0_RAM_START,
+	ADAR300x_PTR0_RAM_STOP,
+	ADAR300x_PTR1_RAM_START,
+	ADAR300x_PTR1_RAM_STOP,
+	ADAR300x_PTR2_RAM_START,
+	ADAR300x_PTR2_RAM_STOP,
+	ADAR300x_PTR3_RAM_START,
+	ADAR300x_PTR3_RAM_STOP,
+};
+
+enum adar300x_iio_ram_idxs {
+	ADAR300x_RAM_INDEX0,
+	ADAR300x_RAM_INDEX1,
+	ADAR300x_RAM_INDEX2,
+	ADAR300x_RAM_INDEX3,
+};
+
+enum adar300x_iio_fifo_attr {
+	ADAR300x_FIFO_WR0,
+	ADAR300x_FIFO_RD0,
+	ADAR300x_FIFO_WR1,
+	ADAR300x_FIFO_RD1,
+	ADAR300x_FIFO_WR2,
+	ADAR300x_FIFO_RD2,
+	ADAR300x_FIFO_WR3,
+	ADAR300x_FIFO_RD3,
+};
+
+enum adar300x_iio_amp_bias {
+	ADAR300x_RESET_EL0V_AMP,
+	ADAR300x_RESET_EL1V_AMP,
+	ADAR300x_RESET_EL2V_AMP,
+	ADAR300x_RESET_EL3V_AMP,
+	ADAR300x_OPERATIONAL_EL0V_AMP,
+	ADAR300x_OPERATIONAL_EL1V_AMP,
+	ADAR300x_OPERATIONAL_EL2V_AMP,
+	ADAR300x_OPERATIONAL_EL3V_AMP,
+	ADAR300x_MUTE_EL0V_AMP,
+	ADAR300x_MUTE_EL1V_AMP,
+	ADAR300x_MUTE_EL2V_AMP,
+	ADAR300x_MUTE_EL3V_AMP,
+	ADAR300x_SLEEP_EL0V_AMP,
+	ADAR300x_SLEEP_EL1V_AMP,
+	ADAR300x_SLEEP_EL2V_AMP,
+	ADAR300x_SLEEP_EL3V_AMP,
+	ADAR300x_OPERATIONAL_EL0H_AMP,
+	ADAR300x_OPERATIONAL_EL1H_AMP,
+	ADAR300x_OPERATIONAL_EL2H_AMP,
+	ADAR300x_OPERATIONAL_EL3H_AMP,
+	ADAR300x_SLEEP_EL0H_AMP,
+	ADAR300x_SLEEP_EL1H_AMP,
+	ADAR300x_SLEEP_EL2H_AMP,
+	ADAR300x_SLEEP_EL3H_AMP,
+};
+
+enum adar300x_beamstate_mode_ctrl {
+	ADAR300x_DIRECT_CTRL,
+	ADAR300x_MEMORY_CTRL,
+	ADAR300x_FIFO_CTRL,
+	ADAR300x_INST_DIRECT_CTRL,
+	ADAR300x_RESET,
+	ADAR300x_MUTE,
+};
+
+struct adar300x_chip_info {
+	unsigned int			chip_id;
+	unsigned int			num_channels;
+	const struct iio_chan_spec	*channels;
+	unsigned int			unpacked_beamst_len;
+	unsigned int			packed_beamst_len;
+	unsigned int			product_id;
+};
+
+struct adar300x_state {
+	struct iio_dev				*indio_dev;
+	struct spi_device			*spi;
+	struct regmap				*regmap;
+	const struct adar300x_chip_info		*chip_info;
+	u16					dev_addr;
+	u8					beam_index[ADAR300x_BEAMS_PER_DEVICE];
+	u8			state_buf[ADAR300x_BEAMS_PER_DEVICE][ADAR300x_CHANNELS_PER_BEAM];
+	enum adar300x_beamstate_mode_ctrl	beam_mode[ADAR300x_BEAMS_PER_DEVICE];
+	enum adar300x_beamstate_mode_ctrl	beam_load_mode[ADAR300x_BEAMS_PER_DEVICE];
+	struct mutex				lock;
+	struct iio_dma_buffer_queue		queue;
+	struct iio_buffer			*dma_buffer;
+	struct gpio_desc			*gpio_reset;
+};
+
 
 enum adar300x_ADC_sel {
 	ADAR300x_ADC_ANALG0,
@@ -652,7 +817,7 @@ static int adar300x_write_raw(struct iio_dev *indio_dev,
 	};
 }
 
-ssize_t adar300x_amp_en_store(struct device *dev,
+static ssize_t adar300x_amp_en_store(struct device *dev,
 			      struct device_attribute *attr,
 			      const char *buf, size_t len)
 {
@@ -683,7 +848,7 @@ err_unlock:
 	return ret ? ret : len;
 }
 
-ssize_t adar300x_amp_en_show(struct device *dev,
+static ssize_t adar300x_amp_en_show(struct device *dev,
 			      struct device_attribute *attr,
 			      char *buf)
 {
@@ -712,7 +877,7 @@ err_unlock:
 	return ret;
 }
 
-ssize_t adar300x_amp_bias_store(struct device *dev,
+static ssize_t adar300x_amp_bias_store(struct device *dev,
 			      struct device_attribute *attr,
 			      const char *buf, size_t len)
 {
@@ -743,7 +908,7 @@ err_unlock:
 	return ret ? ret : len;
 }
 
-ssize_t adar300x_amp_bias_show(struct device *dev,
+static ssize_t adar300x_amp_bias_show(struct device *dev,
 			      struct device_attribute *attr,
 			      char *buf)
 {
@@ -772,7 +937,7 @@ err_unlock:
 	return ret;
 }
 
-ssize_t adar300x_update_store(struct device *dev,
+static ssize_t adar300x_update_store(struct device *dev,
 			      struct device_attribute *attr,
 			      const char *buf, size_t len)
 {
@@ -800,7 +965,7 @@ err_unlock:
 	return ret ? ret : len;
 }
 
-ssize_t adar300x_update_show(struct device *dev,
+static ssize_t adar300x_update_show(struct device *dev,
 			      struct device_attribute *attr,
 			      char *buf)
 {
@@ -833,7 +998,7 @@ err_unlock:
 	return ret;
 }
 
-ssize_t adar300x_ram_index_store(struct device *dev,
+static ssize_t adar300x_ram_index_store(struct device *dev,
 			      struct device_attribute *attr,
 			      const char *buf, size_t len)
 {
@@ -853,7 +1018,7 @@ ssize_t adar300x_ram_index_store(struct device *dev,
 	return len;
 }
 
-ssize_t adar300x_ram_index_show(struct device *dev,
+static ssize_t adar300x_ram_index_show(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
@@ -867,7 +1032,7 @@ ssize_t adar300x_ram_index_show(struct device *dev,
 	return sprintf(buf, "%d\n", readval);
 }
 
-ssize_t adar300x_ram_range_store(struct device *dev,
+static ssize_t adar300x_ram_range_store(struct device *dev,
 			      struct device_attribute *attr,
 			      const char *buf, size_t len)
 {
@@ -900,7 +1065,7 @@ err_unlock:
 	return ret ? ret : len;
 }
 
-ssize_t adar300x_ram_range_show(struct device *dev,
+static ssize_t adar300x_ram_range_show(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
@@ -931,7 +1096,7 @@ err_unlock:
 	return ret;
 }
 
-ssize_t adar300x_fifo_ptr_show(struct device *dev,
+static ssize_t adar300x_fifo_ptr_show(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
@@ -961,7 +1126,7 @@ err_unlock:
 	return ret;
 }
 
-ssize_t adar300x_show_update_intf_ctrl_available(struct device *dev,
+static ssize_t adar300x_show_update_intf_ctrl_available(struct device *dev,
 					   struct device_attribute *attr,
 					   char *buf)
 {
@@ -970,14 +1135,13 @@ ssize_t adar300x_show_update_intf_ctrl_available(struct device *dev,
 
 	for (i = 0; i < ARRAY_SIZE(adar300x_update_intf_ctrl); ++i) {
 		if (adar300x_update_intf_ctrl[i])
-			len += strscpy(buf + len, adar300x_update_intf_ctrl[i],
-				       sizeof(adar300x_update_intf_ctrl[i]));
+			len += sprintf(buf + len, "%s ", adar300x_update_intf_ctrl[i]);
 	}
 
 	return len;
 }
 
-ssize_t adar300x_update_intf_ctrl_store(struct device *dev,
+static ssize_t adar300x_update_intf_ctrl_store(struct device *dev,
 			      struct device_attribute *attr,
 			      const char *buf, size_t len)
 {
@@ -1006,7 +1170,7 @@ err_unlock:
 	return ret ? ret : len;
 }
 
-ssize_t adar300x_update_intf_ctrl_show(struct device *dev,
+static ssize_t adar300x_update_intf_ctrl_show(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
@@ -1032,7 +1196,7 @@ err_unlock:
 	return ret;
 }
 
-ssize_t adar300x_load_mode_store(struct device *dev,
+static ssize_t adar300x_load_mode_store(struct device *dev,
 			      struct device_attribute *attr,
 			      const char *buf, size_t len)
 {
@@ -1053,7 +1217,7 @@ ssize_t adar300x_load_mode_store(struct device *dev,
 	return len;
 }
 
-ssize_t adar300x_load_mode_show(struct device *dev,
+static ssize_t adar300x_load_mode_show(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
@@ -1067,7 +1231,7 @@ ssize_t adar300x_load_mode_show(struct device *dev,
 	return sprintf(buf, "%s\n", adar300x_mode_ctrl[readval]);
 }
 
-ssize_t adar300x_show_mode_available(struct device *dev,
+static ssize_t adar300x_show_mode_available(struct device *dev,
 					   struct device_attribute *attr,
 					   char *buf)
 {
@@ -1076,14 +1240,13 @@ ssize_t adar300x_show_mode_available(struct device *dev,
 
 	for (i = 0; i < ARRAY_SIZE(adar300x_mode_ctrl); ++i) {
 		if (adar300x_mode_ctrl[i])
-			len += strscpy(buf + len, adar300x_mode_ctrl[i],
-				       sizeof(adar300x_mode_ctrl[i]));
+			len += sprintf(buf + len, "%s ", adar300x_mode_ctrl[i]);
 	}
 
 	return len;
 }
 
-ssize_t adar300x_mode_store(struct device *dev,
+static ssize_t adar300x_mode_store(struct device *dev,
 			      struct device_attribute *attr,
 			      const char *buf, size_t len)
 {
@@ -1126,7 +1289,7 @@ ssize_t adar300x_mode_store(struct device *dev,
 	return len;
 }
 
-ssize_t adar300x_mode_show(struct device *dev,
+static ssize_t adar300x_mode_show(struct device *dev,
 			struct device_attribute *attr,
 			char *buf)
 {
@@ -1364,7 +1527,7 @@ static int ad300x_reset(struct gpio_desc *gpio_reset)
 	return 0;
 }
 
-int adar300x_probe(struct spi_device *spi, const struct attribute_group *attr_group)
+static int adar300x_probe(struct spi_device *spi, const struct attribute_group *attr_group)
 {
 	struct device_node		*child, *np = spi->dev.of_node;
 	int				ret, cnt = 0, num_dev;
@@ -1441,3 +1604,781 @@ int adar300x_probe(struct spi_device *spi, const struct attribute_group *attr_gr
 
 	return 0;
 }
+
+enum adar3000_iio_dev_attr {
+	ADAR3000_BEAM0,
+	ADAR3000_BEAM1,
+	ADAR3000_BEAM2,
+	ADAR3000_BEAM3,
+	ADAR3000_BEAMS_NO,
+};
+
+static IIO_DEVICE_ATTR(beam0_update, 0644,
+		       adar300x_update_show, adar300x_update_store, ADAR3000_BEAM0);
+
+static IIO_DEVICE_ATTR(beam1_update, 0644,
+		       adar300x_update_show, adar300x_update_store, ADAR3000_BEAM1);
+
+static IIO_DEVICE_ATTR(beam2_update, 0644,
+		       adar300x_update_show, adar300x_update_store, ADAR3000_BEAM2);
+
+static IIO_DEVICE_ATTR(beam3_update, 0644,
+		       adar300x_update_show, adar300x_update_store, ADAR3000_BEAM3);
+
+static IIO_DEVICE_ATTR(update_intf_ctrl_available, 0444,
+		       adar300x_show_update_intf_ctrl_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(update_intf_ctrl, 0644,
+		       adar300x_update_intf_ctrl_show, adar300x_update_intf_ctrl_store, 0);
+
+static IIO_DEVICE_ATTR(beam0_mode, 0644,
+		       adar300x_mode_show, adar300x_mode_store, ADAR3000_BEAM0);
+
+static IIO_DEVICE_ATTR(beam1_mode, 0644,
+		       adar300x_mode_show, adar300x_mode_store, ADAR3000_BEAM1);
+
+static IIO_DEVICE_ATTR(beam2_mode, 0644,
+		       adar300x_mode_show, adar300x_mode_store, ADAR3000_BEAM2);
+
+static IIO_DEVICE_ATTR(beam3_mode, 0644,
+		       adar300x_mode_show, adar300x_mode_store, ADAR3000_BEAM3);
+
+static IIO_DEVICE_ATTR(beam0_mode_available, 0444, adar300x_show_mode_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(beam1_mode_available, 0444, adar300x_show_mode_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(beam2_mode_available, 0444, adar300x_show_mode_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(beam3_mode_available, 0444, adar300x_show_mode_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(beam0_load_mode, 0644,
+		       adar300x_load_mode_show, adar300x_load_mode_store, ADAR3000_BEAM0);
+
+static IIO_DEVICE_ATTR(beam1_load_mode, 0644,
+		       adar300x_load_mode_show, adar300x_load_mode_store, ADAR3000_BEAM1);
+
+static IIO_DEVICE_ATTR(beam2_load_mode, 0644,
+		       adar300x_load_mode_show, adar300x_load_mode_store, ADAR3000_BEAM2);
+
+static IIO_DEVICE_ATTR(beam3_load_mode, 0644,
+		       adar300x_load_mode_show, adar300x_load_mode_store, ADAR3000_BEAM3);
+
+static IIO_DEVICE_ATTR(beam0_load_mode_available, 0444, adar300x_show_mode_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(beam1_load_mode_available, 0444, adar300x_show_mode_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(beam2_load_mode_available, 0444, adar300x_show_mode_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(beam3_load_mode_available, 0444, adar300x_show_mode_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(beam0_ram_start, 0644,
+		       adar300x_ram_range_show, adar300x_ram_range_store, ADAR300x_PTR0_RAM_START);
+
+static IIO_DEVICE_ATTR(beam1_ram_start, 0644,
+		       adar300x_ram_range_show, adar300x_ram_range_store, ADAR300x_PTR1_RAM_START);
+
+static IIO_DEVICE_ATTR(beam2_ram_start, 0644,
+		       adar300x_ram_range_show, adar300x_ram_range_store, ADAR300x_PTR2_RAM_START);
+
+static IIO_DEVICE_ATTR(beam3_ram_start, 0644,
+		       adar300x_ram_range_show, adar300x_ram_range_store, ADAR300x_PTR3_RAM_START);
+
+static IIO_DEVICE_ATTR(beam0_ram_stop, 0644,
+		       adar300x_ram_range_show, adar300x_ram_range_store, ADAR300x_PTR0_RAM_STOP);
+
+static IIO_DEVICE_ATTR(beam1_ram_stop, 0644,
+		       adar300x_ram_range_show, adar300x_ram_range_store, ADAR300x_PTR1_RAM_STOP);
+
+static IIO_DEVICE_ATTR(beam2_ram_stop, 0644,
+		       adar300x_ram_range_show, adar300x_ram_range_store, ADAR300x_PTR2_RAM_STOP);
+
+static IIO_DEVICE_ATTR(beam3_ram_stop, 0644,
+		       adar300x_ram_range_show, adar300x_ram_range_store, ADAR300x_PTR3_RAM_STOP);
+
+static IIO_DEVICE_ATTR(beam0_ram_index, 0644,
+		       adar300x_ram_index_show, adar300x_ram_index_store, ADAR300x_RAM_INDEX0);
+
+static IIO_DEVICE_ATTR(beam1_ram_index, 0644,
+		       adar300x_ram_index_show, adar300x_ram_index_store, ADAR300x_RAM_INDEX1);
+
+static IIO_DEVICE_ATTR(beam2_ram_index, 0644,
+		       adar300x_ram_index_show, adar300x_ram_index_store, ADAR300x_RAM_INDEX2);
+
+static IIO_DEVICE_ATTR(beam3_ram_index, 0644,
+		       adar300x_ram_index_show, adar300x_ram_index_store, ADAR300x_RAM_INDEX3);
+
+static IIO_DEVICE_ATTR(beam0_fifo_rd, 0644,
+		       adar300x_fifo_ptr_show, NULL, ADAR300x_FIFO_RD0);
+
+static IIO_DEVICE_ATTR(beam1_fifo_rd, 0644,
+		       adar300x_fifo_ptr_show, NULL, ADAR300x_FIFO_RD1);
+
+static IIO_DEVICE_ATTR(beam2_fifo_rd, 0644,
+		       adar300x_fifo_ptr_show, NULL, ADAR300x_FIFO_RD2);
+
+static IIO_DEVICE_ATTR(beam3_fifo_rd, 0644,
+		       adar300x_fifo_ptr_show, NULL, ADAR300x_FIFO_RD3);
+
+static IIO_DEVICE_ATTR(beam0_fifo_wr, 0644,
+		       adar300x_fifo_ptr_show, NULL, ADAR300x_FIFO_WR0);
+
+static IIO_DEVICE_ATTR(beam1_fifo_wr, 0644,
+		       adar300x_fifo_ptr_show, NULL, ADAR300x_FIFO_WR1);
+
+static IIO_DEVICE_ATTR(beam2_fifo_wr, 0644,
+		       adar300x_fifo_ptr_show, NULL, ADAR300x_FIFO_WR2);
+
+static IIO_DEVICE_ATTR(beam3_fifo_wr, 0644,
+		       adar300x_fifo_ptr_show, NULL, ADAR300x_FIFO_WR3);
+
+static IIO_DEVICE_ATTR(amp_bias_reset_EL0V, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store, ADAR300x_RESET_EL0V_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_reset_EL1V, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store, ADAR300x_RESET_EL1V_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_reset_EL2V, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store, ADAR300x_RESET_EL2V_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_reset_EL3V, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store, ADAR300x_RESET_EL3V_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_operational_EL0V, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store,
+		       ADAR300x_OPERATIONAL_EL0V_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_operational_EL1V, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store,
+		       ADAR300x_OPERATIONAL_EL1V_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_operational_EL2V, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store,
+		       ADAR300x_OPERATIONAL_EL2V_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_operational_EL3V, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store,
+		       ADAR300x_OPERATIONAL_EL3V_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_mute_EL0V, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store, ADAR300x_MUTE_EL0V_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_mute_EL1V, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store, ADAR300x_MUTE_EL1V_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_mute_EL2V, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store, ADAR300x_MUTE_EL2V_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_mute_EL3V, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store, ADAR300x_MUTE_EL3V_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_sleep_EL0V, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store, ADAR300x_SLEEP_EL0V_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_sleep_EL1V, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store, ADAR300x_SLEEP_EL1V_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_sleep_EL2V, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store, ADAR300x_SLEEP_EL2V_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_sleep_EL3V, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store, ADAR300x_SLEEP_EL3V_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_operational_EL0H, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store,
+		       ADAR300x_OPERATIONAL_EL0H_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_operational_EL1H, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store,
+		       ADAR300x_OPERATIONAL_EL1H_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_operational_EL2H, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store,
+		       ADAR300x_OPERATIONAL_EL2H_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_operational_EL3H, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store,
+		       ADAR300x_OPERATIONAL_EL3H_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_sleep_EL0H, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store, ADAR300x_SLEEP_EL0H_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_sleep_EL1H, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store, ADAR300x_SLEEP_EL1H_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_sleep_EL2H, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store, ADAR300x_SLEEP_EL2H_AMP);
+
+static IIO_DEVICE_ATTR(amp_bias_sleep_EL3H, 0644,
+		       adar300x_amp_bias_show, adar300x_amp_bias_store, ADAR300x_SLEEP_EL3H_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_reset_EL0V, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_RESET_EL0V_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_reset_EL1V, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_RESET_EL1V_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_reset_EL2V, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_RESET_EL2V_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_reset_EL3V, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_RESET_EL3V_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_operational_EL0V, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_OPERATIONAL_EL0V_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_operational_EL1V, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_OPERATIONAL_EL1V_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_operational_EL2V, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_OPERATIONAL_EL2V_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_operational_EL3V, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_OPERATIONAL_EL3V_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_mute_EL0V, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_MUTE_EL0V_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_mute_EL1V, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_MUTE_EL1V_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_mute_EL2V, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_MUTE_EL2V_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_mute_EL3V, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_MUTE_EL3V_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_sleep_EL0V, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_SLEEP_EL0V_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_sleep_EL1V, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_SLEEP_EL1V_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_sleep_EL2V, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_SLEEP_EL2V_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_sleep_EL3V, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_SLEEP_EL3V_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_operational_EL0H, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_OPERATIONAL_EL0H_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_operational_EL1H, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_OPERATIONAL_EL1H_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_operational_EL2H, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_OPERATIONAL_EL2H_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_operational_EL3H, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_OPERATIONAL_EL3H_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_sleep_EL0H, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_SLEEP_EL0H_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_sleep_EL1H, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_SLEEP_EL1H_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_sleep_EL2H, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_SLEEP_EL2H_AMP);
+
+static IIO_DEVICE_ATTR(amp_en_sleep_EL3H, 0644,
+		       adar300x_amp_en_show, adar300x_amp_en_store, ADAR300x_SLEEP_EL3H_AMP);
+
+static struct attribute *adar3000_attributes[] = {
+	&iio_dev_attr_beam0_update.dev_attr.attr,
+	&iio_dev_attr_beam1_update.dev_attr.attr,
+	&iio_dev_attr_beam2_update.dev_attr.attr,
+	&iio_dev_attr_beam3_update.dev_attr.attr,
+
+	&iio_dev_attr_beam0_mode_available.dev_attr.attr,
+	&iio_dev_attr_beam0_mode.dev_attr.attr,
+	&iio_dev_attr_beam1_mode_available.dev_attr.attr,
+	&iio_dev_attr_beam1_mode.dev_attr.attr,
+	&iio_dev_attr_beam2_mode_available.dev_attr.attr,
+	&iio_dev_attr_beam2_mode.dev_attr.attr,
+	&iio_dev_attr_beam3_mode_available.dev_attr.attr,
+	&iio_dev_attr_beam3_mode.dev_attr.attr,
+
+	&iio_dev_attr_beam0_load_mode_available.dev_attr.attr,
+	&iio_dev_attr_beam0_load_mode.dev_attr.attr,
+	&iio_dev_attr_beam1_load_mode_available.dev_attr.attr,
+	&iio_dev_attr_beam1_load_mode.dev_attr.attr,
+	&iio_dev_attr_beam2_load_mode_available.dev_attr.attr,
+	&iio_dev_attr_beam2_load_mode.dev_attr.attr,
+	&iio_dev_attr_beam3_load_mode_available.dev_attr.attr,
+	&iio_dev_attr_beam3_load_mode.dev_attr.attr,
+	&iio_dev_attr_beam0_ram_start.dev_attr.attr,
+
+	&iio_dev_attr_beam1_ram_start.dev_attr.attr,
+	&iio_dev_attr_beam2_ram_start.dev_attr.attr,
+	&iio_dev_attr_beam3_ram_start.dev_attr.attr,
+	&iio_dev_attr_beam0_ram_stop.dev_attr.attr,
+	&iio_dev_attr_beam1_ram_stop.dev_attr.attr,
+	&iio_dev_attr_beam2_ram_stop.dev_attr.attr,
+	&iio_dev_attr_beam3_ram_stop.dev_attr.attr,
+	&iio_dev_attr_beam0_ram_index.dev_attr.attr,
+	&iio_dev_attr_beam1_ram_index.dev_attr.attr,
+	&iio_dev_attr_beam2_ram_index.dev_attr.attr,
+	&iio_dev_attr_beam3_ram_index.dev_attr.attr,
+
+	&iio_dev_attr_beam0_fifo_rd.dev_attr.attr,
+	&iio_dev_attr_beam1_fifo_rd.dev_attr.attr,
+	&iio_dev_attr_beam2_fifo_rd.dev_attr.attr,
+	&iio_dev_attr_beam3_fifo_rd.dev_attr.attr,
+	&iio_dev_attr_beam0_fifo_wr.dev_attr.attr,
+	&iio_dev_attr_beam1_fifo_wr.dev_attr.attr,
+	&iio_dev_attr_beam2_fifo_wr.dev_attr.attr,
+	&iio_dev_attr_beam3_fifo_wr.dev_attr.attr,
+
+	&iio_dev_attr_update_intf_ctrl.dev_attr.attr,
+	&iio_dev_attr_update_intf_ctrl_available.dev_attr.attr,
+
+	&iio_dev_attr_amp_bias_reset_EL0V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_reset_EL1V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_reset_EL2V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_reset_EL3V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_operational_EL0V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_operational_EL1V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_operational_EL2V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_operational_EL3V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_mute_EL0V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_mute_EL1V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_mute_EL2V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_mute_EL3V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_sleep_EL0V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_sleep_EL1V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_sleep_EL2V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_sleep_EL3V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_operational_EL0H.dev_attr.attr,
+	&iio_dev_attr_amp_bias_operational_EL1H.dev_attr.attr,
+	&iio_dev_attr_amp_bias_operational_EL2H.dev_attr.attr,
+	&iio_dev_attr_amp_bias_operational_EL3H.dev_attr.attr,
+	&iio_dev_attr_amp_bias_sleep_EL0H.dev_attr.attr,
+	&iio_dev_attr_amp_bias_sleep_EL1H.dev_attr.attr,
+	&iio_dev_attr_amp_bias_sleep_EL2H.dev_attr.attr,
+	&iio_dev_attr_amp_bias_sleep_EL3H.dev_attr.attr,
+
+	&iio_dev_attr_amp_en_reset_EL0V.dev_attr.attr,
+	&iio_dev_attr_amp_en_reset_EL1V.dev_attr.attr,
+	&iio_dev_attr_amp_en_reset_EL2V.dev_attr.attr,
+	&iio_dev_attr_amp_en_reset_EL3V.dev_attr.attr,
+	&iio_dev_attr_amp_en_operational_EL0V.dev_attr.attr,
+	&iio_dev_attr_amp_en_operational_EL1V.dev_attr.attr,
+	&iio_dev_attr_amp_en_operational_EL2V.dev_attr.attr,
+	&iio_dev_attr_amp_en_operational_EL3V.dev_attr.attr,
+	&iio_dev_attr_amp_en_mute_EL0V.dev_attr.attr,
+	&iio_dev_attr_amp_en_mute_EL1V.dev_attr.attr,
+	&iio_dev_attr_amp_en_mute_EL2V.dev_attr.attr,
+	&iio_dev_attr_amp_en_mute_EL3V.dev_attr.attr,
+	&iio_dev_attr_amp_en_sleep_EL0V.dev_attr.attr,
+	&iio_dev_attr_amp_en_sleep_EL1V.dev_attr.attr,
+	&iio_dev_attr_amp_en_sleep_EL2V.dev_attr.attr,
+	&iio_dev_attr_amp_en_sleep_EL3V.dev_attr.attr,
+	&iio_dev_attr_amp_en_operational_EL0H.dev_attr.attr,
+	&iio_dev_attr_amp_en_operational_EL1H.dev_attr.attr,
+	&iio_dev_attr_amp_en_operational_EL2H.dev_attr.attr,
+	&iio_dev_attr_amp_en_operational_EL3H.dev_attr.attr,
+	&iio_dev_attr_amp_en_sleep_EL0H.dev_attr.attr,
+	&iio_dev_attr_amp_en_sleep_EL1H.dev_attr.attr,
+	&iio_dev_attr_amp_en_sleep_EL2H.dev_attr.attr,
+	&iio_dev_attr_amp_en_sleep_EL3H.dev_attr.attr,
+	NULL,
+};
+
+static const struct attribute_group adar3000_attribute_group = {
+	.attrs = adar3000_attributes,
+};
+
+#define DECLARE_ADAR3000_CHANNELS(name)					\
+static const struct iio_chan_spec name[] = {				\
+	ADAR300x_DELAY_CH(0, 0, "BEAM0_H_EL0_DELAY"),			\
+	ADAR300x_ATTEN_CH(1, 0, "BEAM0_H_EL0_ATTENUATION"),		\
+	ADAR300x_DELAY_CH(2, 1, "BEAM0_H_EL1_DELAY"),			\
+	ADAR300x_ATTEN_CH(3, 1, "BEAM0_H_EL1_ATTENUATION"),		\
+	ADAR300x_DELAY_CH(4, 2, "BEAM0_H_EL2_DELAY"),			\
+	ADAR300x_ATTEN_CH(5, 2, "BEAM0_H_EL2_ATTENUATION"),		\
+	ADAR300x_DELAY_CH(6, 3, "BEAM0_H_EL3_DELAY"),			\
+	ADAR300x_ATTEN_CH(7, 3, "BEAM0_H_EL3_ATTENUATION"),		\
+									\
+	ADAR300x_DELAY_CH(8, 4, "BEAM0_V_EL0_DELAY"),			\
+	ADAR300x_ATTEN_CH(9, 4, "BEAM0_V_EL0_ATTENUATION"),		\
+	ADAR300x_DELAY_CH(10, 5, "BEAM0_V_EL1_DELAY"),			\
+	ADAR300x_ATTEN_CH(11, 5, "BEAM0_V_EL1_ATTENUATION"),		\
+	ADAR300x_DELAY_CH(12, 6, "BEAM0_V_EL2_DELAY"),			\
+	ADAR300x_ATTEN_CH(13, 6, "BEAM0_V_EL2_ATTENUATION"),		\
+	ADAR300x_DELAY_CH(14, 7, "BEAM0_V_EL3_DELAY"),			\
+	ADAR300x_ATTEN_CH(15, 7, "BEAM0_V_EL3_ATTENUATION"),		\
+									\
+	ADAR300x_DELAY_CH(16, 8, "BEAM1_V_EL0_DELAY"),			\
+	ADAR300x_ATTEN_CH(17, 8, "BEAM1_V_EL0_ATTENUATION"),		\
+	ADAR300x_DELAY_CH(18, 9, "BEAM1_V_EL1_DELAY"),			\
+	ADAR300x_ATTEN_CH(19, 9, "BEAM1_V_EL1_ATTENUATION"),		\
+	ADAR300x_DELAY_CH(20, 10, "BEAM1_V_EL2_DELAY"),			\
+	ADAR300x_ATTEN_CH(21, 10, "BEAM1_V_EL2_ATTENUATION"),		\
+	ADAR300x_DELAY_CH(22, 11, "BEAM1_V_EL3_DELAY"),			\
+	ADAR300x_ATTEN_CH(23, 11, "BEAM1_V_EL3_ATTENUATION"),		\
+									\
+	ADAR300x_DELAY_CH(24, 12, "BEAM1_H_EL0_DELAY"),			\
+	ADAR300x_ATTEN_CH(25, 12, "BEAM1_H_EL0_ATTENUATION"),		\
+	ADAR300x_DELAY_CH(26, 13, "BEAM1_H_EL1_DELAY"),			\
+	ADAR300x_ATTEN_CH(27, 13, "BEAM1_H_EL1_ATTENUATION"),		\
+	ADAR300x_DELAY_CH(28, 14, "BEAM1_H_EL2_DELAY"),			\
+	ADAR300x_ATTEN_CH(29, 14, "BEAM1_H_EL2_ATTENUATION"),		\
+	ADAR300x_DELAY_CH(30, 15, "BEAM1_H_EL3_DELAY"),			\
+	ADAR300x_ATTEN_CH(31, 15, "BEAM1_H_EL3_ATTENUATION"),		\
+									\
+	ADAR300x_TEMP(32, 16, TEMP),					\
+}
+
+DECLARE_ADAR3000_CHANNELS(adar3000_channels);
+DECLARE_ADAR3000_CHANNELS(adar3001_channels);
+DECLARE_ADAR3000_CHANNELS(adar3002_channels);
+
+static const struct adar300x_chip_info adar3000_chip_info_tbl[] = {
+	[ID_ADAR3000] = {
+		.chip_id = ID_ADAR3000,
+		.channels = adar3000_channels,
+		.num_channels = ARRAY_SIZE(adar3000_channels),
+		.unpacked_beamst_len = 8,
+		.packed_beamst_len = 6,
+		.product_id = ADAR3000_PRODUCT_ID,
+	},
+	[ID_ADAR3001] = {
+		.chip_id = ID_ADAR3001,
+		.channels = adar3001_channels,
+		.num_channels = ARRAY_SIZE(adar3002_channels),
+		.unpacked_beamst_len = 8,
+		.packed_beamst_len = 6,
+		.product_id = ADAR3000_PRODUCT_ID,
+	},
+	[ID_ADAR3002] = {
+		.chip_id = ID_ADAR3002,
+		.channels = adar3002_channels,
+		.num_channels = ARRAY_SIZE(adar3002_channels),
+		.unpacked_beamst_len = 8,
+		.packed_beamst_len = 6,
+		.product_id = ADAR3000_PRODUCT_ID,
+	},
+};
+
+static int adar3000_probe(struct spi_device *spi)
+{
+	return adar300x_probe(spi, &adar3000_attribute_group);
+}
+
+static const struct of_device_id adar3000_of_match[] = {
+	{ .compatible = "adi,adar3000",
+		.data = &adar3000_chip_info_tbl[ID_ADAR3000], },
+	{ .compatible = "adi,adar3001",
+		.data = &adar3000_chip_info_tbl[ID_ADAR3001], },
+	{ .compatible = "adi,adar3002",
+		.data = &adar3000_chip_info_tbl[ID_ADAR3002], },
+	{ }
+};
+
+MODULE_DEVICE_TABLE(of, adar3000_of_match);
+
+static struct spi_driver adar3000_driver = {
+	.driver = {
+		.name	= "adar3000",
+		.of_match_table = adar3000_of_match,
+	},
+	.probe = adar3000_probe,
+};
+
+/* ADAR3003 */
+module_spi_driver(adar3000_driver);
+
+enum adar3003_iio_dev_attr {
+	ADAR3003_EL0VH,
+	ADAR3003_EL1VH,
+	ADAR3003_EL2VH,
+	ADAR3003_EL3VH,
+	ADAR3003_ELEM_NO,
+};
+
+static IIO_DEVICE_ATTR(el0vh_update, 0644,
+		       adar300x_update_show, adar300x_update_store, ADAR3003_EL0VH);
+
+static IIO_DEVICE_ATTR(el1vh_update, 0644,
+		       adar300x_update_show, adar300x_update_store, ADAR3003_EL1VH);
+
+static IIO_DEVICE_ATTR(el2vh_update, 0644,
+		       adar300x_update_show, adar300x_update_store, ADAR3003_EL2VH);
+
+static IIO_DEVICE_ATTR(el3vh_update, 0644,
+		       adar300x_update_show, adar300x_update_store, ADAR3003_EL3VH);
+
+static IIO_DEVICE_ATTR(el0vh_mode, 0644,
+		       adar300x_mode_show, adar300x_mode_store, ADAR3003_EL0VH);
+
+static IIO_DEVICE_ATTR(el1vh_mode, 0644,
+		       adar300x_mode_show, adar300x_mode_store, ADAR3003_EL1VH);
+
+static IIO_DEVICE_ATTR(el2vh_mode, 0644,
+		       adar300x_mode_show, adar300x_mode_store, ADAR3003_EL2VH);
+
+static IIO_DEVICE_ATTR(el3vh_mode, 0644,
+		       adar300x_mode_show, adar300x_mode_store, ADAR3003_EL3VH);
+
+static IIO_DEVICE_ATTR(el0vh_mode_available, 0444, adar300x_show_mode_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(el1vh_mode_available, 0444, adar300x_show_mode_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(el2vh_mode_available, 0444, adar300x_show_mode_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(el3vh_mode_available, 0444, adar300x_show_mode_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(el0vh_load_mode, 0644,
+		       adar300x_load_mode_show, adar300x_load_mode_store, ADAR3003_EL0VH);
+
+static IIO_DEVICE_ATTR(el1vh_load_mode, 0644,
+		       adar300x_load_mode_show, adar300x_load_mode_store, ADAR3003_EL1VH);
+
+static IIO_DEVICE_ATTR(el2vh_load_mode, 0644,
+		       adar300x_load_mode_show, adar300x_load_mode_store, ADAR3003_EL2VH);
+
+static IIO_DEVICE_ATTR(el3vh_load_mode, 0644,
+		       adar300x_load_mode_show, adar300x_load_mode_store, ADAR3003_EL3VH);
+
+static IIO_DEVICE_ATTR(el0vh_load_mode_available, 0444, adar300x_show_mode_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(el1vh_load_mode_available, 0444, adar300x_show_mode_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(el2vh_load_mode_available, 0444, adar300x_show_mode_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(el3vh_load_mode_available, 0444, adar300x_show_mode_available, NULL, 0);
+
+static IIO_DEVICE_ATTR(el0vh_ram_start, 0644,
+		       adar300x_ram_range_show, adar300x_ram_range_store, ADAR300x_PTR0_RAM_START);
+
+static IIO_DEVICE_ATTR(el1vh_ram_start, 0644,
+		       adar300x_ram_range_show, adar300x_ram_range_store, ADAR300x_PTR1_RAM_START);
+
+static IIO_DEVICE_ATTR(el2vh_ram_start, 0644,
+		       adar300x_ram_range_show, adar300x_ram_range_store, ADAR300x_PTR2_RAM_START);
+
+static IIO_DEVICE_ATTR(el3vh_ram_start, 0644,
+		       adar300x_ram_range_show, adar300x_ram_range_store, ADAR300x_PTR3_RAM_START);
+
+static IIO_DEVICE_ATTR(el0vh_ram_stop, 0644,
+		       adar300x_ram_range_show, adar300x_ram_range_store, ADAR300x_PTR0_RAM_STOP);
+
+static IIO_DEVICE_ATTR(el1vh_ram_stop, 0644,
+		       adar300x_ram_range_show, adar300x_ram_range_store, ADAR300x_PTR1_RAM_STOP);
+
+static IIO_DEVICE_ATTR(el2vh_ram_stop, 0644,
+		       adar300x_ram_range_show, adar300x_ram_range_store, ADAR300x_PTR2_RAM_STOP);
+
+static IIO_DEVICE_ATTR(el3vh_ram_stop, 0644,
+		       adar300x_ram_range_show, adar300x_ram_range_store, ADAR300x_PTR3_RAM_STOP);
+
+static IIO_DEVICE_ATTR(el0vh_ram_index, 0644,
+		       adar300x_ram_index_show, adar300x_ram_index_store, ADAR300x_RAM_INDEX0);
+
+static IIO_DEVICE_ATTR(el1vh_ram_index, 0644,
+		       adar300x_ram_index_show, adar300x_ram_index_store, ADAR300x_RAM_INDEX1);
+
+static IIO_DEVICE_ATTR(el2vh_ram_index, 0644,
+		       adar300x_ram_index_show, adar300x_ram_index_store, ADAR300x_RAM_INDEX2);
+
+static IIO_DEVICE_ATTR(el3vh_ram_index, 0644,
+		       adar300x_ram_index_show, adar300x_ram_index_store, ADAR300x_RAM_INDEX3);
+
+static IIO_DEVICE_ATTR(el0vh_fifo_rd, 0644,
+		       adar300x_fifo_ptr_show, NULL, ADAR300x_FIFO_RD0);
+
+static IIO_DEVICE_ATTR(el1vh_fifo_rd, 0644,
+		       adar300x_fifo_ptr_show, NULL, ADAR300x_FIFO_RD1);
+
+static IIO_DEVICE_ATTR(el2vh_fifo_rd, 0644,
+		       adar300x_fifo_ptr_show, NULL, ADAR300x_FIFO_RD2);
+
+static IIO_DEVICE_ATTR(el3vh_fifo_rd, 0644,
+		       adar300x_fifo_ptr_show, NULL, ADAR300x_FIFO_RD3);
+
+static IIO_DEVICE_ATTR(el0vh_fifo_wr, 0644,
+		       adar300x_fifo_ptr_show, NULL, ADAR300x_FIFO_WR0);
+
+static IIO_DEVICE_ATTR(el1vh_fifo_wr, 0644,
+		       adar300x_fifo_ptr_show, NULL, ADAR300x_FIFO_WR1);
+
+static IIO_DEVICE_ATTR(el2vh_fifo_wr, 0644,
+		       adar300x_fifo_ptr_show, NULL, ADAR300x_FIFO_WR2);
+
+static IIO_DEVICE_ATTR(el3vh_fifo_wr, 0644,
+		       adar300x_fifo_ptr_show, NULL, ADAR300x_FIFO_WR3);
+
+static struct attribute *adar3003_attributes[] = {
+	&iio_dev_attr_el0vh_update.dev_attr.attr,
+	&iio_dev_attr_el1vh_update.dev_attr.attr,
+	&iio_dev_attr_el2vh_update.dev_attr.attr,
+	&iio_dev_attr_el3vh_update.dev_attr.attr,
+
+	&iio_dev_attr_update_intf_ctrl.dev_attr.attr,
+	&iio_dev_attr_update_intf_ctrl_available.dev_attr.attr,
+
+	&iio_dev_attr_el0vh_mode.dev_attr.attr,
+	&iio_dev_attr_el1vh_mode.dev_attr.attr,
+	&iio_dev_attr_el2vh_mode.dev_attr.attr,
+	&iio_dev_attr_el3vh_mode.dev_attr.attr,
+
+	&iio_dev_attr_el0vh_mode_available.dev_attr.attr,
+	&iio_dev_attr_el1vh_mode_available.dev_attr.attr,
+	&iio_dev_attr_el2vh_mode_available.dev_attr.attr,
+	&iio_dev_attr_el3vh_mode_available.dev_attr.attr,
+
+	&iio_dev_attr_el0vh_load_mode.dev_attr.attr,
+	&iio_dev_attr_el1vh_load_mode.dev_attr.attr,
+	&iio_dev_attr_el2vh_load_mode.dev_attr.attr,
+	&iio_dev_attr_el3vh_load_mode.dev_attr.attr,
+
+	&iio_dev_attr_el0vh_load_mode_available.dev_attr.attr,
+	&iio_dev_attr_el1vh_load_mode_available.dev_attr.attr,
+	&iio_dev_attr_el2vh_load_mode_available.dev_attr.attr,
+	&iio_dev_attr_el3vh_load_mode_available.dev_attr.attr,
+
+	&iio_dev_attr_el0vh_ram_start.dev_attr.attr,
+	&iio_dev_attr_el1vh_ram_start.dev_attr.attr,
+	&iio_dev_attr_el2vh_ram_start.dev_attr.attr,
+	&iio_dev_attr_el3vh_ram_start.dev_attr.attr,
+
+	&iio_dev_attr_el0vh_ram_stop.dev_attr.attr,
+	&iio_dev_attr_el1vh_ram_stop.dev_attr.attr,
+	&iio_dev_attr_el2vh_ram_stop.dev_attr.attr,
+	&iio_dev_attr_el3vh_ram_stop.dev_attr.attr,
+
+	&iio_dev_attr_el0vh_ram_index.dev_attr.attr,
+	&iio_dev_attr_el1vh_ram_index.dev_attr.attr,
+	&iio_dev_attr_el2vh_ram_index.dev_attr.attr,
+	&iio_dev_attr_el3vh_ram_index.dev_attr.attr,
+
+	&iio_dev_attr_el0vh_fifo_rd.dev_attr.attr,
+	&iio_dev_attr_el1vh_fifo_rd.dev_attr.attr,
+	&iio_dev_attr_el2vh_fifo_rd.dev_attr.attr,
+	&iio_dev_attr_el3vh_fifo_rd.dev_attr.attr,
+
+	&iio_dev_attr_el0vh_fifo_wr.dev_attr.attr,
+	&iio_dev_attr_el1vh_fifo_wr.dev_attr.attr,
+	&iio_dev_attr_el2vh_fifo_wr.dev_attr.attr,
+	&iio_dev_attr_el3vh_fifo_wr.dev_attr.attr,
+
+	&iio_dev_attr_amp_bias_reset_EL0V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_reset_EL1V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_reset_EL2V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_reset_EL3V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_operational_EL0V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_operational_EL1V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_operational_EL2V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_operational_EL3V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_mute_EL0V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_mute_EL1V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_mute_EL2V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_mute_EL3V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_sleep_EL0V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_sleep_EL1V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_sleep_EL2V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_sleep_EL3V.dev_attr.attr,
+	&iio_dev_attr_amp_bias_operational_EL0H.dev_attr.attr,
+	&iio_dev_attr_amp_bias_operational_EL1H.dev_attr.attr,
+	&iio_dev_attr_amp_bias_operational_EL2H.dev_attr.attr,
+	&iio_dev_attr_amp_bias_operational_EL3H.dev_attr.attr,
+	&iio_dev_attr_amp_bias_sleep_EL0H.dev_attr.attr,
+	&iio_dev_attr_amp_bias_sleep_EL1H.dev_attr.attr,
+	&iio_dev_attr_amp_bias_sleep_EL2H.dev_attr.attr,
+	&iio_dev_attr_amp_bias_sleep_EL3H.dev_attr.attr,
+
+	&iio_dev_attr_amp_en_reset_EL0V.dev_attr.attr,
+	&iio_dev_attr_amp_en_reset_EL1V.dev_attr.attr,
+	&iio_dev_attr_amp_en_reset_EL2V.dev_attr.attr,
+	&iio_dev_attr_amp_en_reset_EL3V.dev_attr.attr,
+	&iio_dev_attr_amp_en_operational_EL0V.dev_attr.attr,
+	&iio_dev_attr_amp_en_operational_EL1V.dev_attr.attr,
+	&iio_dev_attr_amp_en_operational_EL2V.dev_attr.attr,
+	&iio_dev_attr_amp_en_operational_EL3V.dev_attr.attr,
+	&iio_dev_attr_amp_en_mute_EL0V.dev_attr.attr,
+	&iio_dev_attr_amp_en_mute_EL1V.dev_attr.attr,
+	&iio_dev_attr_amp_en_mute_EL2V.dev_attr.attr,
+	&iio_dev_attr_amp_en_mute_EL3V.dev_attr.attr,
+	&iio_dev_attr_amp_en_sleep_EL0V.dev_attr.attr,
+	&iio_dev_attr_amp_en_sleep_EL1V.dev_attr.attr,
+	&iio_dev_attr_amp_en_sleep_EL2V.dev_attr.attr,
+	&iio_dev_attr_amp_en_sleep_EL3V.dev_attr.attr,
+	&iio_dev_attr_amp_en_operational_EL0H.dev_attr.attr,
+	&iio_dev_attr_amp_en_operational_EL1H.dev_attr.attr,
+	&iio_dev_attr_amp_en_operational_EL2H.dev_attr.attr,
+	&iio_dev_attr_amp_en_operational_EL3H.dev_attr.attr,
+	&iio_dev_attr_amp_en_sleep_EL0H.dev_attr.attr,
+	&iio_dev_attr_amp_en_sleep_EL1H.dev_attr.attr,
+	&iio_dev_attr_amp_en_sleep_EL2H.dev_attr.attr,
+	&iio_dev_attr_amp_en_sleep_EL3H.dev_attr.attr,
+	NULL,
+};
+
+static const struct attribute_group adar3003_attribute_group = {
+	.attrs = adar3003_attributes,
+};
+
+#define DECLARE_ADAR3003_CHANNELS(name)				\
+static const struct iio_chan_spec name[] = {			\
+	ADAR300x_DELAY_CH(0, 0, "EL0V_DELAY"),			\
+	ADAR300x_ATTEN_CH(1, 0, "EL0V_ATTENUATION"),		\
+	ADAR300x_DELAY_CH(2, 1, "EL0H_DELAY"),			\
+	ADAR300x_ATTEN_CH(3, 1, "EL0H_ATTENUATION"),		\
+								\
+	ADAR300x_DELAY_CH(4, 2, "EL1V_DELAY"),			\
+	ADAR300x_ATTEN_CH(5, 2, "EL1V_ATTENUATION"),		\
+	ADAR300x_DELAY_CH(6, 3, "EL1H_DELAY"),			\
+	ADAR300x_ATTEN_CH(7, 3, "EL1H_ATTENUATION"),		\
+								\
+	ADAR300x_DELAY_CH(8, 4, "EL2V_DELAY"),			\
+	ADAR300x_ATTEN_CH(9, 4, "EL2V_ATTENUATION"),		\
+	ADAR300x_DELAY_CH(10, 5, "EL2H_DELAY"),			\
+	ADAR300x_ATTEN_CH(11, 5, "EL2H_ATTENUATION"),		\
+								\
+	ADAR300x_DELAY_CH(12, 6, "EL3V_DELAY"),			\
+	ADAR300x_ATTEN_CH(13, 6, "EL3V_ATTENUATION"),		\
+	ADAR300x_DELAY_CH(14, 7, "EL3H_DELAY"),			\
+	ADAR300x_ATTEN_CH(15, 7, "EL3H_ATTENUATION"),		\
+								\
+	ADAR300x_TEMP(32, 16, TEMP),				\
+}
+
+DECLARE_ADAR3003_CHANNELS(adar3003_channels);
+
+static const struct adar300x_chip_info adar3003_chip_info_tbl[] = {
+	[ID_ADAR3003] = {
+		.chip_id = ID_ADAR3003,
+		.channels = adar3003_channels,
+		.num_channels = ARRAY_SIZE(adar3003_channels),
+		.unpacked_beamst_len = 4,
+		.packed_beamst_len = 3,
+		.product_id = ADAR3003_PRODUCT_ID,
+	},
+};
+
+static const struct of_device_id adar3003_of_match[] = {
+	{ .compatible = "adi,adar3003",
+		.data = &adar3003_chip_info_tbl[ID_ADAR3003], },
+	{ }
+};
+
+MODULE_DEVICE_TABLE(of, adar3000_of_match);
+
+static int adar3003_probe(struct spi_device *spi)
+{
+	return adar300x_probe(spi, &adar3003_attribute_group);
+}
+
+static struct spi_driver adar3003_driver = {
+	.driver = {
+		.name	= "adar3003",
+		.of_match_table = adar3003_of_match,
+	},
+	.probe = adar3003_probe,
+};
+
+module_spi_driver(adar3003_driver);
+
+MODULE_AUTHOR("Cristian Pop <cristian.pop@analog.com>");
+MODULE_DESCRIPTION("Analog Devices ADAR300x Beamformer");
+MODULE_LICENSE("Dual BSD/GPL");
