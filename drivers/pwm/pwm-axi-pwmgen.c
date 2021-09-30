@@ -30,6 +30,7 @@
 #define AXI_PWMGEN_LOAD_CONIG		BIT(1)
 #define AXI_PWMGEN_RESET		BIT(0)
 
+
 struct axi_pwmgen {
 	struct pwm_chip		chip;
 	struct clk		*clk;
@@ -75,6 +76,7 @@ static int axi_pwmgen_apply(struct pwm_chip *chip, struct pwm_device *device,
 	struct axi_pwmgen *pwm = to_axi_pwmgen(chip);
 	unsigned int ch = device->hwpwm;
 
+	axi_pwmgen_write_mask(pwm, AXI_PWMGEN_REG_CONFIG, AXI_PWMGEN_RESET, 1);
 	clk_rate = clk_get_rate(pwm->clk);
 	if (state->enabled) {
 		target_rate = DIV_ROUND_CLOSEST(NSEC_PER_SEC, state->period);
@@ -101,7 +103,9 @@ static int axi_pwmgen_apply(struct pwm_chip *chip, struct pwm_device *device,
 	axi_pwmgen_write(pwm, AXI_PWMGEN_CHX_OFFSET(ch), offset_cnt);
 
 	/* Apply the new config */
-	axi_pwmgen_write(pwm, AXI_PWMGEN_REG_CONFIG, AXI_PWMGEN_LOAD_CONIG);
+	// axi_pwmgen_write(pwm, AXI_PWMGEN_REG_CONFIG, AXI_PWMGEN_LOAD_CONIG);
+
+	axi_pwmgen_write_mask(pwm, AXI_PWMGEN_REG_CONFIG, AXI_PWMGEN_RESET, 0);
 
 	return 0;
 }
