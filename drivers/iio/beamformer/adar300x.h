@@ -150,6 +150,7 @@ struct adar300x_chip_info {
 	const struct iio_chan_spec	*channels;
 	unsigned int			unpacked_beamst_len;
 	unsigned int			packed_beamst_len;
+	unsigned int			product_id;
 };
 
 struct adar300x_state {
@@ -165,6 +166,7 @@ struct adar300x_state {
 	struct mutex				lock;
 	struct iio_dma_buffer_queue		queue;
 	struct iio_buffer			*dma_buffer;
+	struct gpio_desc			*gpio_reset;
 };
 
 ssize_t adar300x_ram_range_store(struct device *dev,

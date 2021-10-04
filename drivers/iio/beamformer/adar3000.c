@@ -10,6 +10,8 @@
 #include <linux/module.h>
 #include "adar300x.h"
 
+#define ADAR3000_PRODUCT_ID 0x01
+
 enum adar3000_iio_dev_attr {
 	ADAR3000_BEAM0,
 	ADAR3000_BEAM1,
@@ -445,6 +447,7 @@ static const struct adar300x_chip_info adar3000_chip_info_tbl[] = {
 		.num_channels = ARRAY_SIZE(adar3000_channels),
 		.unpacked_beamst_len = 8,
 		.packed_beamst_len = 6,
+		.product_id = ADAR3000_PRODUCT_ID,
 	},
 	[ID_ADAR3001] = {
 		.chip_id = ID_ADAR3001,
@@ -452,6 +455,7 @@ static const struct adar300x_chip_info adar3000_chip_info_tbl[] = {
 		.num_channels = ARRAY_SIZE(adar3002_channels),
 		.unpacked_beamst_len = 8,
 		.packed_beamst_len = 6,
+		.product_id = ADAR3000_PRODUCT_ID,
 	},
 	[ID_ADAR3002] = {
 		.chip_id = ID_ADAR3002,
@@ -459,6 +463,7 @@ static const struct adar300x_chip_info adar3000_chip_info_tbl[] = {
 		.num_channels = ARRAY_SIZE(adar3002_channels),
 		.unpacked_beamst_len = 8,
 		.packed_beamst_len = 6,
+		.product_id = ADAR3000_PRODUCT_ID,
 	},
 };
 

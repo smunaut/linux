@@ -153,7 +153,6 @@
 #define ADAR300x_MAX_GAIN		31	/* dB */
 #define ADAR300x_MAX_PHASE		360	/* degree */
 #define ADAR300x_CHIP_TYPE		0x01
-#define ADAR300x_PRODUCT_ID		0x01
 
 enum adar300x_ADC_sel {
 	ADAR300x_ADC_ANALG0,
@@ -1267,12 +1266,24 @@ static int adar300x_setup(struct iio_dev *indio_dev)
 	if (ret < 0)
 		return ret;
 
-	if (val != ADAR300x_PRODUCT_ID) {
+	if (val != st->chip_info->product_id) {
 		dev_err(indio_dev->dev.parent, "Failed to read PRODUCT_ID_L %x", val);
 		return -EIO;
 	}
 
 	return adar300x_adc_setup(st, ADAR300x_ADC_TEMPERATURE);
+}
+
+static int ad300x_reset(struct gpio_desc *gpio_reset)
+{
+	if (!IS_ERR(gpio_reset)) {
+		gpiod_set_value_cansleep(gpio_reset, 0);
+		ndelay(100);
+		gpiod_set_value_cansleep(gpio_reset, 1);
+		ndelay(100);
+	}
+
+	return 0;
 }
 
 int adar300x_probe(struct spi_device *spi, const struct attribute_group *attr_group)
@@ -1283,6 +1294,7 @@ int adar300x_probe(struct spi_device *spi, const struct attribute_group *attr_gr
 	struct regmap			*regmap;
 	struct adar300x_state		*st;
 	const struct adar300x_chip_info *info;
+	struct gpio_desc		*gpio_reset;
 	u32				tmp;
 
 	num_dev = of_get_available_child_count(np);
@@ -1298,6 +1310,10 @@ int adar300x_probe(struct spi_device *spi, const struct attribute_group *attr_gr
 		return PTR_ERR(regmap);
 	}
 
+	gpio_reset = devm_gpiod_get(&spi->dev, "reset", GPIOD_OUT_LOW);
+	if (!IS_ERR(gpio_reset))
+		ad300x_reset(gpio_reset);
+
 	for_each_available_child_of_node(np, child) {
 		indio_dev = devm_iio_device_alloc(&spi->dev, sizeof(*st));
 		if (!indio_dev)
@@ -1312,6 +1328,7 @@ int adar300x_probe(struct spi_device *spi, const struct attribute_group *attr_gr
 		dev_set_drvdata(&spi->dev, st);
 		st->chip_info = info;
 		st->regmap = regmap;
+		st->gpio_reset = gpio_reset;
 		ret = of_property_read_u32(child, "reg", &tmp);
 		if (ret < 0)
 			return ret;
