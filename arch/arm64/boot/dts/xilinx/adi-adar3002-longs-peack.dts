@@ -13,7 +13,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 		// 78 offset
-		out-gpios = <&gpio 110 0>, <&gpio 111 0>, <&gpio 112 0>, <&gpio 113 0>;
+		out-gpios = <&gpio 110 0>, <&gpio 112 0>, <&gpio 113 0>;
 		label = "long_peack_control";
 
 		channel@0 {
@@ -22,14 +22,10 @@
 		};
 		channel@1 {
 			reg = <1>;
-			label = "RSTB";
+			label = "UPDATE";
 		};
 		channel@2 {
 			reg = <2>;
-			label = "UPDATE";
-		};
-		channel@3 {
-			reg = <3>;
 			label = "RESET";
 		};
 	};
@@ -46,6 +42,7 @@
 		label = "adar3002_T0";
 		#address-cells = <1>;
 		#size-cells = <0>;
+		reset-gpios = <&gpio 111 0>;
 
 		adar3002_0@0 {
 			reg = <0>;
@@ -123,6 +120,7 @@
 		label = "adar3002_T1";
 		#address-cells = <1>;
 		#size-cells = <0>;
+		reset-gpios = <&gpio 111 0>;
 
 		adar3002_0@0 {
 			reg = <0>;
@@ -200,6 +198,7 @@
 		label = "adar3002_T2";
 		#address-cells = <1>;
 		#size-cells = <0>;
+		reset-gpios = <&gpio 111 0>;
 
 		adar3002_0@0 {
 			reg = <0>;
@@ -277,6 +276,7 @@
 		label = "adar3002_T3";
 		#address-cells = <1>;
 		#size-cells = <0>;
+		reset-gpios = <&gpio 111 0>;
 
 		adar3002_0@0 {
 			reg = <0>;
