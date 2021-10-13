@@ -1552,6 +1552,9 @@ static int adar300x_probe(struct spi_device *spi, const struct attribute_group *
 	}
 
 	gpio_reset = devm_gpiod_get(&spi->dev, "reset", GPIOD_OUT_LOW);
+	if (PTR_ERR(gpio_reset) == -EPROBE_DEFER)
+		return -EPROBE_DEFER;
+
 	if (!IS_ERR(gpio_reset))
 		ad300x_reset(gpio_reset);
 
