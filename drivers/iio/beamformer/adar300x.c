@@ -161,6 +161,8 @@
 #define ADAR300x_ADC_NUM_CLOCKS		7
 
 #define ADAR3000_PRODUCT_ID 0x01
+#define ADAR3001_PRODUCT_ID 0x01
+#define ADAR3002_PRODUCT_ID 0x00
 #define ADAR3003_PRODUCT_ID 0x00
 
 #define ADAR300x_BEAMS_PER_DEVICE	4
@@ -2051,7 +2053,7 @@ static const struct adar300x_chip_info adar3000_chip_info_tbl[] = {
 		.num_channels = ARRAY_SIZE(adar3002_channels),
 		.unpacked_beamst_len = 8,
 		.packed_beamst_len = 6,
-		.product_id = ADAR3000_PRODUCT_ID,
+		.product_id = ADAR3001_PRODUCT_ID,
 	},
 	[ID_ADAR3002] = {
 		.chip_id = ID_ADAR3002,
@@ -2059,7 +2061,7 @@ static const struct adar300x_chip_info adar3000_chip_info_tbl[] = {
 		.num_channels = ARRAY_SIZE(adar3002_channels),
 		.unpacked_beamst_len = 8,
 		.packed_beamst_len = 6,
-		.product_id = ADAR3000_PRODUCT_ID,
+		.product_id = ADAR3002_PRODUCT_ID,
 	},
 };
 
