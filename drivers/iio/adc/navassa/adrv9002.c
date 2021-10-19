@@ -538,6 +538,48 @@ static const char * const adrv9002_hop_table[ADRV9002_FH_TABLES_NR + 1] = {
 	"Unknown"
 };
 
+static int adrv9002_fh_set(const struct adrv9002_rf_phy *phy, const char *buf, const u64 attr)
+{
+	int ret, tbl;
+
+	if (!phy->curr_profile->sysConfig.fhModeOn && attr != ADRV9002_MCS) {
+		dev_err(&phy->spi->dev, "Frequency hopping not enabled\n");
+		return -ENOTSUPP;
+	} else if (attr == ADRV9002_HOP_2_TABLE_SEL || attr == ADRV9002_HOP_2_TRIGGER) {
+		if (phy->fh.mode != ADI_ADRV9001_FHMODE_LO_RETUNE_REALTIME_PROCESS_DUAL_HOP) {
+			dev_err(&phy->spi->dev, "HOP2 not supported! FH mode not in dual hop.\n");
+			return -ENOTSUPP;
+		}
+	}
+
+	switch (attr) {
+	case ADRV9002_HOP_1_TABLE_SEL:
+	case ADRV9002_HOP_2_TABLE_SEL:
+		for (tbl = 0; tbl < ARRAY_SIZE(adrv9002_hop_table) - 1; tbl++) {
+			if (sysfs_streq(buf, adrv9002_hop_table[tbl]))
+				break;
+		}
+
+		if (tbl == ARRAY_SIZE(adrv9002_hop_table) - 1) {
+			dev_err(&phy->spi->dev, "Unknown table %s\n", buf);
+			return -EINVAL;
+		}
+
+		ret = adi_adrv9001_fh_HopTable_Set(phy->adrv9001, attr, tbl);
+		break;
+	case ADRV9002_HOP_1_TRIGGER:
+		ret = adi_adrv9001_fh_Hop(phy->adrv9001, ADI_ADRV9001_FH_HOP_SIGNAL_1);
+		break;
+	case ADRV9002_HOP_2_TRIGGER:
+		ret = adi_adrv9001_fh_Hop(phy->adrv9001, ADI_ADRV9001_FH_HOP_SIGNAL_2);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return ret ? adrv9002_dev_err(phy) : 0;
+}
+
 static ssize_t adrv9002_attr_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
@@ -582,52 +624,12 @@ static ssize_t adrv9002_attr_store(struct device *dev, struct device_attribute *
 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
 	struct adrv9002_rf_phy *phy = iio_priv(indio_dev);
 	struct iio_dev_attr *iio_attr = to_iio_dev_attr(attr);
-	int ret, tbl;
+	int ret;
 
 	mutex_lock(&phy->lock);
-	if (!phy->curr_profile->sysConfig.fhModeOn) {
-		dev_err(&phy->spi->dev, "Frequency hopping not enabled\n");
-		mutex_unlock(&phy->lock);
-		return -ENOTSUPP;
-	} else if (iio_attr->address == ADRV9002_HOP_2_TABLE_SEL ||
-		   iio_attr->address == ADRV9002_HOP_2_TRIGGER) {
-		if (phy->fh.mode != ADI_ADRV9001_FHMODE_LO_RETUNE_REALTIME_PROCESS_DUAL_HOP) {
-			dev_err(&phy->spi->dev, "HOP2 not supported! FH mode not in dual hop.\n");
-			mutex_unlock(&phy->lock);
-			return -ENOTSUPP;
-		}
-	}
-
-	switch (iio_attr->address) {
-	case ADRV9002_HOP_1_TABLE_SEL:
-	case ADRV9002_HOP_2_TABLE_SEL:
-		for (tbl = 0; tbl < ARRAY_SIZE(adrv9002_hop_table) - 1; tbl++) {
-			if (sysfs_streq(buf, adrv9002_hop_table[tbl]))
-				break;
-		}
-
-		if (tbl == ARRAY_SIZE(adrv9002_hop_table) - 1) {
-			dev_err(&phy->spi->dev, "Unknown table %s\n", buf);
-			mutex_unlock(&phy->lock);
-			return -EINVAL;
-		}
-
-		ret = adi_adrv9001_fh_HopTable_Set(phy->adrv9001, iio_attr->address, tbl);
-		if (ret)
-			ret = adrv9002_dev_err(phy);
-		break;
-	case ADRV9002_HOP_1_TRIGGER:
-		ret = adi_adrv9001_fh_Hop(phy->adrv9001, ADI_ADRV9001_FH_HOP_SIGNAL_1);
-		break;
-	case ADRV9002_HOP_2_TRIGGER:
-		ret = adi_adrv9001_fh_Hop(phy->adrv9001, ADI_ADRV9001_FH_HOP_SIGNAL_2);
-		break;
-	default:
-		ret = -EINVAL;
-		break;
-	}
-
+	ret = adrv9002_fh_set(phy, buf, iio_attr->address);
 	mutex_unlock(&phy->lock);
+
 	return ret ? ret : len;
 }
 
