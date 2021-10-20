@@ -144,7 +144,7 @@ struct adrv9002_chan {
 	u32 power;
 	int nco_freq;
 	u8 idx;
-	u8 enabled;;
+	u8 enabled;
 };
 
 struct adrv9002_rx_chan {
