@@ -38,6 +38,8 @@
 #include "adi_adrv9001_fh_types.h"
 #include "adi_adrv9001_gpio.h"
 #include "adi_adrv9001_gpio_types.h"
+#include "adi_adrv9001_mcs.h"
+#include "adi_adrv9001_mcs_types.h"
 #include "adi_adrv9001_orx.h"
 #include "adi_adrv9001_powermanagement.h"
 #include "adi_adrv9001_powermanagement_types.h"
@@ -2744,7 +2746,7 @@ static int adrv9002_radio_init(struct adrv9002_rf_phy *phy)
 		return adrv9002_dev_err(phy);
 
 	for (chan = 0; chan < ARRAY_SIZE(phy->channels); chan++) {
-		const struct adrv9002_chan *c = phy->channels[chan];
+		struct adrv9002_chan *c = phy->channels[chan];
 		struct adi_adrv9001_ChannelEnablementDelays en_delays;
 
 		if (!c->enabled)
@@ -2773,6 +2775,14 @@ static int adrv9002_radio_init(struct adrv9002_rf_phy *phy)
 		adrv9002_en_delays_ns_to_arm(phy, &c->en_delays_ns, &en_delays);
 		ret = adi_adrv9001_Radio_ChannelEnablementDelays_Configure(phy->adrv9001, c->port,
 									   c->number, &en_delays);
+		if (ret)
+			return adrv9002_dev_err(phy);
+
+		if (!phy->curr_profile->sysConfig.mcsMode)
+			continue;
+
+		ret = adi_adrv9001_Mcs_ChannelMcsDelay_Set(phy->adrv9001, c->port, c->number,
+							   &c->mcs_delay);
 		if (ret)
 			return adrv9002_dev_err(phy);
 	}
@@ -3622,7 +3632,18 @@ static int adrv9002_parse_tx_dt(struct adrv9002_rf_phy *phy,
 	if (ret)
 		return ret;
 
-	return adrv9002_parse_tx_pin_dt(phy, node, tx);
+	ret = adrv9002_parse_tx_pin_dt(phy, node, tx);
+	if (ret)
+		return ret;
+
+	/* mcs delays */
+	ret = ADRV9002_OF_U32_GET_VALIDATE(&phy->spi->dev, node, "adi,mcs-read-delay", 0,
+					   0, 15, tx->channel.mcs_delay.readDelay, false);
+	if (ret)
+		return ret;
+
+	return ADRV9002_OF_U32_GET_VALIDATE(&phy->spi->dev, node, "adi,mcs-sample-delay", 0, 0,
+					    65535, tx->channel.mcs_delay.sampleDelay, false);
 }
 
 static int adrv9002_parse_rx_pinctl_dt(struct adrv9002_rf_phy *phy,
@@ -3953,7 +3974,14 @@ static int adrv9002_parse_rx_dt(struct adrv9002_rf_phy *phy,
 			return PTR_ERR(rx->orx_gpio);
 	}
 
-	return 0;
+	/* mcs delays */
+	ret = ADRV9002_OF_RX_OPTIONAL("adi,mcs-read-delay", 1, 1, 15,
+				      rx->channel.mcs_delay.readDelay);
+	if (ret)
+		return ret;
+
+	return ADRV9002_OF_RX_OPTIONAL("adi,mcs-sample-delay", 0, 0, 65535,
+				       rx->channel.mcs_delay.sampleDelay);
 }
 
 static int adrv9002_parse_dt(struct adrv9002_rf_phy *phy)
