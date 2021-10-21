@@ -20,6 +20,46 @@
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
 
+/* ADMV4420 Register Map */
+#define ADMV4420_SPI_CONFIG_1			0x00
+#define ADMV4420_SPI_CONFIG_2			0x01
+#define ADMV4420_CHIPTYPE			0x03
+#define ADMV4420_PRODUCT_ID_L			0x04
+#define ADMV4420_PRODUCT_ID_H			0x05
+#define ADMV4420_SCRATCHPAD			0x0A
+#define ADMV4420_SPI_REV			0x0B
+#define ADMV4420_ENABLES			0x103
+#define ADMV4420_SDO_LEVEL			0x108
+#define ADMV4420_INT_L				0x200
+#define ADMV4420_INT_H				0x201
+#define ADMV4420_FRAC_L				0x202
+#define ADMV4420_FRAC_M				0x203
+#define ADMV4420_FRAC_H				0x204
+#define ADMV4420_MOD_L				0x208
+#define ADMV4420_MOD_M				0x209
+#define ADMV4420_MOD_H				0x20A
+#define ADMV4420_R_DIV_L			0x20C
+#define ADMV4420_R_DIV_H			0x20D
+#define ADMV4420_REFERENCE			0x20E
+#define ADMV4420_VCO_DATA_READBACK1		0x211
+#define ADMV4420_VCO_DATA_READBACK2		0x212
+#define ADMV4420_PLL_MUX_SEL			0x213
+#define ADMV4420_LOCK_DETECT			0x214
+#define ADMV4420_BAND_SELECT			0x215
+#define ADMV4420_VCO_ALC_TIMEOUT		0x216
+#define ADMV4420_VCO_MANUAL			0x217
+#define ADMV4420_ALC				0x219
+#define ADMV4420_VCO_TIMEOUT1			0x21C
+#define ADMV4420_VCO_TIMEOUT2			0x21D
+#define ADMV4420_VCO_BAND_DIV			0x21E
+#define ADMV4420_VCO_READBACK_SEL		0x21F
+#define ADMV4420_AUTOCAL			0x226
+#define ADMV4420_CP_STATE			0x22C
+#define ADMV4420_CP_BLEED_EN			0x22D
+#define ADMV4420_CP_CURRENT			0x22E
+#define ADMV4420_CP_BLEED			0x22F
+
+
 #define ADAR3000_REG_SPI_CONFIG			0x00
 #define ADAR3000_REG_1				0x01
 #define ADAR3000_REG_CHIPTYPE			0x03
@@ -587,68 +627,6 @@ pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 	pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 	return devm_iio_device_register(&spi->dev, indio_dev);
 }
-
-// static int adar3000_probe(struct spi_device *spi)
-// {
-// 	struct iio_dev *indio_dev;
-// 	struct adar3000_state *st;
-// 	const struct adar3000_chip_info *info;
-// 	struct regmap *regmap;
-// 	int ret;
-// 	// u32 tmp;
-
-// 	pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
-
-// 	indio_dev = devm_iio_device_alloc(&spi->dev, sizeof(*st));
-// 	if (!indio_dev)
-// 		return -ENOMEM;
-
-// 	regmap = devm_regmap_init_spi(spi, &adar3000_regmap_config);
-// 	if (IS_ERR(regmap)) {
-// 		dev_err(&spi->dev, "Error initializing spi regmap: %ld\n",
-// 			PTR_ERR(regmap));
-// 		return PTR_ERR(regmap);
-// 	}
-// pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
-// 	info = of_device_get_match_data(&spi->dev);
-// 	if (!info)
-// 		return -ENODEV;
-// pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
-// 	st = iio_priv(indio_dev);
-// 	st->chip_info = info;
-// 	spi_set_drvdata(spi, indio_dev);
-// 	st->spi = spi;
-// 	st->regmap = regmap;
-// pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
-// 	indio_dev->dev.parent = &spi->dev;
-// 	pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
-// 	indio_dev->name = "";
-// 	pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
-// 	indio_dev->info = &adar3000_info;
-// 	pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
-// 	indio_dev->modes = INDIO_DIRECT_MODE;
-// 	pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
-// 	indio_dev->channels = st->chip_info->channels;
-// 	pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
-// 	indio_dev->num_channels = st->chip_info->num_channels;
-
-// pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
-
-// 	/* Do setup for each device */
-// 	ret = adar3000_setup(indio_dev);
-// 	if (ret < 0) {
-// 		dev_err(&spi->dev, "Setup failed (%d)\n", ret);
-// 		return ret;
-// 	}
-// pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
-// 	ret = devm_iio_device_register(&spi->dev, indio_dev);
-// 	if (ret < 0)
-// 		return ret;
-
-// pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
-
-// 	return 0;
-// }
 
 static const struct of_device_id adar3000_of_match[] = {
 	{ .compatible = "adi,admv4420",
