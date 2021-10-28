@@ -2094,7 +2094,7 @@ MODULE_DEVICE_TABLE(of, adar3000_of_match);
 
 static struct spi_driver adar3000_driver = {
 	.driver = {
-		.name	= "adar3000",
+		.name	= "adar300x",
 		.of_match_table = adar3000_of_match,
 	},
 	.probe = adar3000_probe,
