@@ -59,182 +59,6 @@
 #define ADMV4420_CP_CURRENT			0x22E
 #define ADMV4420_CP_BLEED			0x22F
 
-
-#define ADAR3000_REG_SPI_CONFIG			0x00
-#define ADAR3000_REG_1				0x01
-#define ADAR3000_REG_CHIPTYPE			0x03
-#define ADAR3000_REG_PRODUCT_ID_L		0x04
-#define ADAR3000_REG_PRODUCT_ID_H		0x05
-#define ADAR3000_REG_ADDRESS_PAGE		0x08
-#define ADAR3000_REG_SCRATCHPAD			0x0A
-#define ADAR3000_REG_SPI_REV			0x0B
-#define	ADAR3000_REG_BEAM0_MAP			0x10
-#define	ADAR3000_REG_BEAM1_MAP			0x11
-#define	ADAR3000_REG_BEAM2_MAP			0x12
-#define	ADAR3000_REG_BEAM3_MAP			0x13
-#define ADAR3000_REG_BEAMFORMER_MODE		0x14
-#define ADAR3000_REG_BEAMSTATE_MODE		0x15
-#define ADAR3000_REG_BEAM_SLEEP			0x16
-#define ADAR3000_REG_BM0_MEM_SEQPTR_START	0x17
-#define ADAR3000_REG_BM0_MEM_SEQPTR_STOP	0x18
-#define ADAR3000_REG_BM1_MEM_SEQPTR_START	0x19
-#define ADAR3000_REG_BM1_MEM_SEQPTR_STOP	0x1A
-#define ADAR3000_REG_BM2_MEM_SEQPTR_START	0x1B
-#define ADAR3000_REG_BM2_MEM_SEQPTR_STOP	0x1C
-#define ADAR3000_REG_BM3_MEM_SEQPTR_START	0x1D
-#define ADAR3000_REG_BM3_MEM_SEQPTR_STOP	0x1E
-#define ADAR3000_REG_ADC_CONTROL		0x20
-#define ADAR3000_REG_ADC_CONTROL2		0x21
-#define ADAR3000_REG_ADC_DATA_OUT		0x22
-#define ADAR3000_REG_DAC_DATA_MSB		0x23
-#define ADAR3000_REG_DAC_DATA_LSB		0x24
-#define ADAR3000_REG_DAC_CONTROL		0x25
-#define ADAR3000_REG_BM0_FIFO_WRITE_POINTER	0x50
-#define ADAR3000_REG_BM0_FIFO_READ_POINTER	0x51
-#define ADAR3000_REG_BM1_FIFO_WRITE_POINTER	0x52
-#define ADAR3000_REG_BM1_FIFO_READ_POINTER	0x53
-#define ADAR3000_REG_BM2_FIFO_WRITE_POINTER	0x54
-#define ADAR3000_REG_BM2_FIFO_READ_POINTER	0x55
-#define ADAR3000_REG_BM3_FIFO_WRITE_POINTER	0x56
-#define ADAR3000_REG_BM3_FIFO_READ_POINTER	0x57
-
-/* Beam state Reset for BEAM0 - BEAM3 */
-#define ADAR3000_REG_RESET_DELAY_EL0(x)		(0x80 + (x << 3))
-#define ADAR3000_REG_RESET_ATTN_EL0(x)		(0x81 + (x << 3))
-#define ADAR3000_REG_RESET_DELAY_EL1(x)		(0x82 + (x << 3))
-#define ADAR3000_REG_RESET_ATTN_EL1(x)		(0x83 + (x << 3))
-#define ADAR3000_REG_RESET_DELAY_EL2(x)		(0x84 + (x << 3))
-#define ADAR3000_REG_RESET_ATTN_EL2(x)		(0x85 + (x << 3))
-#define ADAR3000_REG_RESET_DELAY_EL3(x)		(0x86 + (x << 3))
-#define ADAR3000_REG_RESET_ATTN_EL3(x)		(0x87 + (x << 3))
-
-/* Beam state Mute for BEAM0 - BEAM3 */
-#define ADAR3000_REG_MUTE_DELAY_BM0_EL0		(0xA0 + (x << 3))
-#define ADAR3000_REG_MUTE_ATTN_BM0_EL0		(0xA1 + (x << 3))
-#define ADAR3000_REG_MUTE_DELAY_BM0_EL1		(0xA2 + (x << 3))
-#define ADAR3000_REG_MUTE_ATTN_BM0_EL1		(0xA3 + (x << 3))
-#define ADAR3000_REG_MUTE_DELAY_BM0_EL2		(0xA4 + (x << 3))
-#define ADAR3000_REG_MUTE_ATTN_BM0_EL2		(0xA5 + (x << 3))
-#define ADAR3000_REG_MUTE_DELAY_BM0_EL3		(0xA6 + (x << 3))
-#define ADAR3000_REG_MUTE_ATTN_BM0_EL3		(0xA7 + (x << 3))
-
-#define ADAR3000_REG_RESET_BM0_AMP		0xC0
-#define ADAR3000_REG_RESET_BM1_AMP		0xC1
-#define ADAR3000_REG_RESET_BM2_AMP		0xC2
-#define ADAR3000_REG_RESET_BM3_AMP		0xC3
-
-#define ADAR3000_REG_OPERATIONAL_BM0_AMP	0xC4
-#define ADAR3000_REG_OPERATIONAL_BM1_AMP	0xC5
-#define ADAR3000_REG_OPERATIONAL_BM2_AMP	0xC6
-#define ADAR3000_REG_OPERATIONAL_BM3_AMP	0xC7
-
-#define ADAR3000_REG_MUTE_BM0_AMP		0xC8
-#define ADAR3000_REG_MUTE_BM1_AMP		0xC9
-#define ADAR3000_REG_MUTE_BM2_AMP		0xCA
-#define ADAR3000_REG_MUTE_BM3_AMP		0xCB
-
-#define ADAR3000_REG_SLEEP_BM0_AMP		0xCC
-#define ADAR3000_REG_SLEEP_BM1_AMP		0xCD
-#define ADAR3000_REG_SLEEP_BM2_AMP		0xCE
-#define ADAR3000_REG_SLEEP_BM3_AMP		0xCF
-
-#define ADAR3000_REG_OPERATIONAL_EL0_AMP	0xD0
-#define ADAR3000_REG_OPERATIONAL_EL1_AMP	0xD1
-#define ADAR3000_REG_OPERATIONAL_EL2_AMP	0xD2
-#define ADAR3000_REG_OPERATIONAL_EL3_AMP	0xD3
-
-#define ADAR3000_REG_SLEEP_EL0_AMP		0xD4
-#define ADAR3000_REG_SLEEP_EL1_AMP		0xD5
-#define ADAR3000_REG_SLEEP_EL2_AMP		0xD6
-#define ADAR3000_REG_SLEEP_EL3_AMP		0xD7
-
-/* ADAR3000/3001 direct control registers  BEAM0 to BEAM3 */
-#define ADAR3000_REG_DRCT_CNTRL_DELAY_EL0(x)	(0x100 + (x << 3))
-#define ADAR3000_REG_DRCT_CNTRL_ATTN_EL0(x)	(0x101 + (x << 3))
-#define ADAR3000_REG_DRCT_CNTRL_DELAY_EL1(x)	(0x102 + (x << 3))
-#define ADAR3000_REG_DRCT_CNTRL_ATTN_EL1(x)	(0x103 + (x << 3))
-#define ADAR3000_REG_DRCT_CNTRL_DELAY_EL2(x)	(0x104 + (x << 3))
-#define ADAR3000_REG_DRCT_CNTRL_ATTN_EL2(x)	(0x105 + (x << 3))
-#define ADAR3000_REG_DRCT_CNTRL_DELAY_EL3(x)	(0x106 + (x << 3))
-#define ADAR3000_REG_DRCT_CNTRL_ATTN_EL3(x)	(0x107 + (x << 3))
-
-/* ADAR3002 direct control registers H/V BEAM0 to BEAM1 */
-#define ADAR3002_REG_DRCT_CNTRL_DELAY_EL0H(x)	(0x100 + (x) * (0x03 << 3))
-#define ADAR3002_REG_DRCT_CNTRL_ATTEN_EL0H(x)	(0x101 + (x) * (0x03 << 3))
-#define ADAR3002_REG_DRCT_CNTRL_DELAY_EL1H(x)	(0x102 + (x) * (0x03 << 3))
-#define ADAR3002_REG_DRCT_CNTRL_ATTEN_EL1H(x)	(0x103 + (x) * (0x03 << 3))
-#define ADAR3002_REG_DRCT_CNTRL_DELAY_EL2H(x)	(0x104 + (x) * (0x03 << 3))
-#define ADAR3002_REG_DRCT_CNTRL_ATTEN_EL2H(x)	(0x105 + (x) * (0x03 << 3))
-#define ADAR3002_REG_DRCT_CNTRL_DELAY_EL3H(x)	(0x106 + (x) * (0x03 << 3))
-#define ADAR3002_REG_DRCT_CNTRL_ATTEN_EL3H(x)	(0x107 + (x) * (0x03 << 3))
-
-#define ADAR3002_REG_DRCT_CNTRL_DELAY_EL0V(x)	(0x108 + (x) * 0x08)
-#define ADAR3002_REG_DRCT_CNTRL_ATTEN_EL0V(x)	(0x109 + (x) * 0x08)
-#define ADAR3002_REG_DRCT_CNTRL_DELAY_EL1V(x)	(0x10A + (x) * 0x08)
-#define ADAR3002_REG_DRCT_CNTRL_ATTEN_EL1V(x)	(0x10B + (x) * 0x08)
-#define ADAR3002_REG_DRCT_CNTRL_DELAY_EL2V(x)	(0x10C + (x) * 0x08)
-#define ADAR3002_REG_DRCT_CNTRL_ATTEN_EL2V(x)	(0x10D + (x) * 0x08)
-#define ADAR3002_REG_DRCT_CNTRL_DELAY_EL3V(x)	(0x10E + (x) * 0x08)
-#define ADAR3002_REG_DRCT_CNTRL_ATTEN_EL3V(x)	(0x10F + (x) * 0x08)
-
-/* ADAR3003 direct control registers only one BEAM from EL0 to EL3 */
-#define ADAR3003_REG_DRCT_CNTRL_DELAY_ELV(x)	(0x100 + (x) * 0x08)
-#define ADAR3003_REG_DRCT_CNTRL_ATTN_ELV(x)	(0x101 + (x) * 0x08)
-#define ADAR3003_REG_DRCT_CNTRL_DELAY_ELH(x)	(0x102 + (x) * 0x08)
-#define ADAR3003_REG_DRCT_CNTRL_ATTN_ELH(x)	(0x103 + (x) * 0x08)
-
-
-#define ADAR3000_REG_BM0_SEQ_PTR(x)	(0x200 + x)
-#define ADAR3000_REG_BM1_SEQ_PTR(x)	(0x240 + x)
-#define ADAR3000_REG_BM2_SEQ_PTR(x)	(0x280 + x)
-#define ADAR3000_REG_BM3_SEQ_PTR(x)	(0x2C0 + x)
-
-#define ADAR3000_REG_RESET_BM0_STREAM_IN(x)	(0x300 + x)
-#define ADAR3000_REG_RESET_BM1_STREAM_IN(x)	(0x306 + x)
-#define ADAR3000_REG_RESET_BM2_STREAM_IN(x)	(0x30C + x)
-#define ADAR3000_REG_RESET_BM3_STREAM_IN(x)	(0x312 + x)
-
-#define ADAR3000_REG_MUTE_BM0_STREAM_IN(x)	(0x318 + x)
-#define ADAR3000_REG_MUTE_BM1_STREAM_IN(x)	(0x31E + x)
-#define ADAR3000_REG_MUTE_BM2_STREAM_IN(x)	(0x324 + x)
-#define ADAR3000_REG_MUTE_BM3_STREAM_IN(x)	(0x32A + x)
-
-#define ADAR3000_REG_DRCT_CNTRL_BM0_STREAM_IN(x)	(0x330 + x)
-#define ADAR3000_REG_DRCT_CNTRL_BM1_STREAM_IN(x)	(0x336 + x)
-#define ADAR3000_REG_DRCT_CNTRL_BM2_STREAM_IN(x)	(0x33C + x)
-#define ADAR3000_REG_DRCT_CNTRL_BM3_STREAM_IN(x)	(0x342 + x)
-
-/* Beam statei RAM
- * state - beam state number
- * pos - position in memory location 0 - 63
- */
-#define ADAR3000_RAM_BEAM_STATE(state, pos)		(0x100 + (state * 6) + pos)
-
-/* Beam state FIFO
- * state - beam state number
- * pos - position in memory location 0 - 15
- */
-#define ADAR3000_FIFO_BEAM_STATE(state, pos)		(0x100 + (state * 0x10) + pos)
-
-/* ADAR3000_REG_SPI_CONFIG */
-#define ADAR3000_SPI_CONFIG_RESET_	BIT(7)
-#define ADAR3000_SPI_CONFIG_BIG_ENDIAN_	BIT(5)
-#define ADAR3000_SPI_CONFIG_SDOACTIVE_	BIT(4)
-#define ADAR3000_SPI_CONFIG_SDOACTIVE	BIT(3)
-#define ADAR3000_SPI_CONFIG_BIG_ENDIAN	BIT(2)
-#define ADAR3000_SPI_CONFIG_RESET	BIT(0)
-
-/* ADAR3000_REG_BEAMSTATE_MODE */
-#define ADAR3000_BM0_MODE	0x03
-#define ADAR3000_BM1_MODE	0x0C
-#define ADAR3000_BM2_MODE	0x30
-#define ADAR3000_BM3_MODE	0xC0
-
-#define ADAR3000_SPI_ADDR_MSK		GENMASK(13, 10)
-#define ADAR3000_SPI_ADDR(x)		FIELD_PREP(ADAR3000_SPI_ADDR_MSK, x)
-
-#define ADAR3000_MAX_DEV	16
-
 enum adar3000_ids {
 	ID_ADAR3000,
 	ID_ADAR3002,
@@ -258,13 +82,14 @@ struct adar3000_chip_info {
 	unsigned int			num_channels;
 	const struct iio_chan_spec	*channels;
 };
-
+#define ADAR300x_MAX_RAM_STATES 4
 struct adar3000_state {
 	struct spi_device		*spi;
 	struct regmap			*regmap;
 	const struct adar3000_chip_info	*chip_info;
 	u8				dev_addr;
 	struct adar3000_beam_state	*beam_st;
+	u8				beam_index[ADAR300x_MAX_RAM_STATES];
 };
 
 static const struct regmap_config adar3000_regmap_config = {
@@ -369,6 +194,56 @@ static int adar3000_write_raw_get_fmt(struct iio_dev *indio_dev,
 	.extend_name = name,					\
 }
 
+
+static ssize_t adar300x_update_show(struct device *dev,
+			      struct device_attribute *attr,
+			      char *buf)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct adar3000_state *st = iio_priv(indio_dev);
+	struct iio_dev_attr *this_attr = to_iio_dev_attr(attr);
+	int ret, beam;
+	u32 readval;
+
+	beam = this_attr->address;
+	readval = st->beam_index[beam];
+
+	ret = sprintf(buf, "%d\n", readval);
+
+	return ret;
+}
+
+static ssize_t adar300x_update_store(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf, size_t len)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct iio_dev_attr *this_attr = to_iio_dev_attr(attr);
+	struct adar3000_state *st = iio_priv(indio_dev);
+	u8 readval;
+	int ret = 0, beam;
+
+	beam = this_attr->address;
+	ret = kstrtou8(buf, 10, &readval);
+	if (readval > (ADAR300x_MAX_RAM_STATES - 1))
+		return -EINVAL;
+
+	st->beam_index[beam] = readval;
+
+	return len;
+}
+
+static IIO_DEVICE_ATTR(beam0_update, 0644,
+		       adar300x_update_show, adar300x_update_store, 0);
+
+static struct attribute *adar3000_attributes[] = {
+	&iio_dev_attr_beam0_update.dev_attr.attr,
+	NULL,
+};
+
+static const struct attribute_group adar3000_attribute_group = {
+	.attrs = adar3000_attributes,
+};
 /* Maybe ditch the entire channel to element mapping and just use the
  * beamstates as a reference attribute. Suggestion may include a new type of
  * raw value similar go hardwaregain, phase -> beamstate */
@@ -461,26 +336,6 @@ enum adar1000_iio_dev_attr {
 	ADAR3000_MODE_CTRL,
 };
 
-/* The beam mode is develop with beamstate as the central point
- * For this to work beamstate are used for IIO channels. This proposal seems
- * to make more sense */
-static ssize_t adar3000_beam_mode_available(struct iio_dev *indio_dev,
-					      uintptr_t private,
-					      const struct iio_chan_spec *chan,
-					      char *buf)
-{
-	// struct axiadc_converter *conv = iio_device_get_drvdata(indio_dev);
-	size_t len = 0;
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(adar3000_mode_ctrl); ++i) {
-		if (adar3000_mode_ctrl[i])
-			len += sprintf(buf + len, "%s ", adar3000_mode_ctrl[i]);
-	}
-	len += sprintf(buf + len, "\n");
-	return len;
-}
-
 static ssize_t adar3000_beam_mode_read(struct iio_dev *indio_dev,
 				    uintptr_t private,
 				    const struct iio_chan_spec *chan, char *buf)
@@ -489,13 +344,11 @@ static ssize_t adar3000_beam_mode_read(struct iio_dev *indio_dev,
 	u32 readval;
 	int ret;
 
-	ret = adar3000_reg_read(st, ADAR3000_REG_BEAMSTATE_MODE, &readval);
+	ret = adar3000_reg_read(st, 0x0a, &readval);
 	if (ret <0)
 		return ret;
 
-	readval = FIELD_GET(ADAR3000_BM0_MODE << chan->address, readval);
-
-	return sprintf(buf, "%s\n", adar3000_mode_ctrl[readval]);
+	return sprintf(buf, "%d\n", readval);
 }
 
 static ssize_t adar3000_beam_mode_write(struct iio_dev *indio_dev,
@@ -503,19 +356,14 @@ static ssize_t adar3000_beam_mode_write(struct iio_dev *indio_dev,
 				     const struct iio_chan_spec *chan,
 				     const char *buf, size_t len)
 {
-	struct adar3000_state *st = iio_device_get_drvdata(indio_dev);
-	unsigned int mode = 0, i;
+	struct adar3000_state *st = iio_priv(indio_dev);
+	u8 readin;
 	int ret;
+	ret = kstrtou8(buf, 10, &readin);
+	if (ret)
+		return ret;
 
-	for (i = 0; i < ARRAY_SIZE(adar3000_mode_ctrl); ++i) {
-		if (adar3000_mode_ctrl[i] && sysfs_streq(buf, adar3000_mode_ctrl[i])) {
-			mode = i;
-			break;
-		}
-	}
-
-	ret = adar3000_reg_update(st, ADAR3000_REG_BEAMSTATE_MODE,
-				  ADAR3000_BM0_MODE << chan->address, mode); 
+	ret = adar3000_reg_write(st, 0x0a, readin); 
 
 	return ret ? ret : len;
 }
@@ -540,8 +388,8 @@ static const struct iio_info adar3000_info = {
 	.write_raw = &adar3000_write_raw,
 	.write_raw_get_fmt = &adar3000_write_raw_get_fmt,
 	.debugfs_reg_access = &adar3000_reg_access,
+	.attrs = &adar3000_attribute_group,
 };
-
 
 static int adar3000_setup(struct iio_dev *indio_dev)
 {
@@ -587,6 +435,7 @@ pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 
 static int adar3000_probe(struct spi_device *spi)
 {
+
 	struct iio_dev *indio_dev;
 	struct adar3000_state *st;
 	struct regmap *regmap;
@@ -612,7 +461,7 @@ pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 	st->spi = spi;
 	st->chip_info = info;
 	st->regmap = regmap;
-
+	
 pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 	indio_dev->dev.parent = &spi->dev;
 	indio_dev->name = "admv4420";
