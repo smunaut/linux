@@ -78,15 +78,10 @@ struct adar3000_beam_state {
 	u8 atten3 : 6;
 };
 
-struct adar3000_chip_info {
-	unsigned int			num_channels;
-	const struct iio_chan_spec	*channels;
-};
 #define ADAR300x_MAX_RAM_STATES 4
 struct adar3000_state {
 	struct spi_device		*spi;
 	struct regmap			*regmap;
-	const struct adar3000_chip_info	*chip_info;
 	u8				dev_addr;
 	struct adar3000_beam_state	*beam_st;
 	u8				beam_index[ADAR300x_MAX_RAM_STATES];
@@ -303,21 +298,6 @@ DECLARE_ADAR3000_CHANNELS(adar3000_channels);
 DECLARE_ADAR3002_CHANNELS(adar3002_channels);
 DECLARE_ADAR3003_CHANNELS(adar3003_channels);
 
-static const struct adar3000_chip_info adar3000_chip_info_tbl[] = {
-	[ID_ADAR3000] = {
-		.channels = adar3000_channels,
-		.num_channels = 16,
-	},
-	[ID_ADAR3002] = {
-		.channels = adar3002_channels,
-		.num_channels = 16,
-	},
-	[ID_ADAR3003] = {
-		.channels = adar3003_channels,
-		.num_channels = 8,
-	},
-};
-
 enum adar3000_beamstate_mode_ctrl {
 	ADAR3000_DIRECT_CTRL,
 	ADAR3000_MEMORY_CTRL,
@@ -439,7 +419,6 @@ static int adar3000_probe(struct spi_device *spi)
 	struct iio_dev *indio_dev;
 	struct adar3000_state *st;
 	struct regmap *regmap;
-	const struct adar3000_chip_info *info;
 	int ret;
 pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 	indio_dev = devm_iio_device_alloc(&spi->dev, sizeof(*st));
@@ -453,13 +432,8 @@ pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 		return PTR_ERR(regmap);
 	}
 	
-	info = of_device_get_match_data(&spi->dev);
-	if (!info)
-		return -ENODEV;
-
 	st = iio_priv(indio_dev);
 	st->spi = spi;
-	st->chip_info = info;
 	st->regmap = regmap;
 	
 pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
@@ -478,9 +452,8 @@ pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 }
 
 static const struct of_device_id adar3000_of_match[] = {
-	{ .compatible = "adi,admv4420",
-		.data = &adar3000_chip_info_tbl[ID_ADAR3000], },
-	{ }
+	{ .compatible = "adi,admv4420" },
+	{ },
 };
 MODULE_DEVICE_TABLE(of, adar3000_of_match);
 
