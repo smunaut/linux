@@ -1,6 +1,5 @@
 /dts-v1/;
 /plugin/;
-
 / {
 	compatible = "brcm,bcm2835", "brcm,bcm2708", "brcm,bcm2709";
 
@@ -15,6 +14,23 @@
 				compatible = "adi,admv4420";
 				reg = <0>;
 				spi-max-frequency = <1000000>;
+
+				/* reference block config */
+				adi,ref_type = <0>;
+				// adi,ref_doubler_en;
+				// adi,ref_divede_by_2_en;
+				adi,ref_diveder = <1>;
+
+				/* N counter config*/
+				adi,N_counter_int_val = <0xA7>;
+				adi,N_counter_frac_val = <0x02>;
+				adi,N_counter_mod_val = <0x04>;
+
+				/* charge pump config */
+				adi,charge_pump_st = <3>;
+				adi,charge_pump_current_uA = <3>;
+				adi,charge_pump_bleed_en = <1>;
+				adi,charge_pump_bleed_current_uA = <0x0C>;
 			};
 		};
 	};

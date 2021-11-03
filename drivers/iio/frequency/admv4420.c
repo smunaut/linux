@@ -16,7 +16,6 @@
 #include <linux/debugfs.h>
 
 #include <linux/of.h>
-
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
 
@@ -61,22 +60,67 @@
 
 #define ADAR300x_MAX_RAM_STATES 4
 
+#define ADMV4420_REFERENCE_IN_MODE(x)		(x << 1)
+#define ADMV4420_REFERENCE_DOUBLER(x)		(x << 2)
+
+#define ENABLE_PLL				BIT(6)
+#define ENABLE_LO				BIT(5)
+#define ENABLE_VCO				BIT(3)
+#define ENABLE_IFAMP				BIT(2)
+#define ENABLE_MIXER				BIT(1)
+#define ENABLE_LNA				BIT(0)
+
+enum admv4420_mux_sel {
+	ADMV4420_LOW = 0,
+	ADMV4420_LOCK_DTCT = 1,
+	ADMV4420_R_COUNTER_PER_2 = 4,
+	ADMV4420_N_CONUTER_PER_2 = 5,
+	ADMV4420_HIGH = 8,
+};
+
 enum admv4420_ref_type {
-	ADMV4420_INTERNAL_REF,
-	ADMV4420_EXTERNAL_REF,
+	ADMV4420_XTAL,
+	ADMV4420_SINGLE_ENDED,
+};
+
+enum admv4420_charge_pump_st {
+	ADMV4420_CHARGE_PUMP_HIGHZ,
+	ADMV4420_CHARGE_PUMP_FORCE_UP,
+	ADMV4420_CHARGE_PUMP_FORCE_DOWN,
+	ADMV4420_CHARGE_PUMP_NORMAL_OP,
 };
 
 struct admv4420_reference_block {
-	u32 ref_freq_hz;
-	enum admv4420_ref_type ref_type;
-	bool ref_doubler_en;
-	bool ref_divede_by_2;
-	u16 ref_diveder;
+	unsigned int freq_hz;
+	enum admv4420_ref_type type;
+	bool doubler_en;
+	bool divede_by_2_en;
+	unsigned int diveder;
+};
+
+struct admv4420_n_counter {
+	u16 int_val;
+	unsigned int frac_val;
+	unsigned int mod_val;
+	unsigned long int n_counter;
+};
+
+struct admv4420_charge_pump {
+	enum admv4420_charge_pump_st state;
+	unsigned int current_uA;
+	bool bleed_en;
+	unsigned int bleed_current_uA;
 };
 
 struct admv4420_state {
 	struct spi_device		*spi;
 	struct regmap			*regmap;
+	unsigned long int 		pfd_freq_hz;
+	unsigned long int 		vco_freq_hz;
+	unsigned long int 		lo_freq_hz;
+	struct admv4420_reference_block ref_block;
+	struct admv4420_n_counter	n_counter;
+	struct admv4420_charge_pump	pump;
 	u8				beam_index[ADAR300x_MAX_RAM_STATES];
 };
 
@@ -221,6 +265,34 @@ static ssize_t admv4420_update_store(struct device *dev,
 	return len;
 }
 
+static ssize_t admv4420_vco_band(struct device *dev,
+				 struct device_attribute *attr,
+				 char *buf)
+{
+	u32 val = 0;
+	size_t len = 0;
+	int i;
+
+
+	// ret = regmap_write(st->regmap, ADMV4420_VCO_READBACK_SEL, 0x04);
+	// if (ret < 0)
+	// 	return ret;
+
+	// ret = regmap_read(st->regmap, ADMV4420_VCO_DATA_READBACK1, &val);
+	// if (ret < 0)
+	// 	return ret;
+	
+	// ret = regmap_write(st->regmap, ADMV4420_VCO_READBACK_SEL, 0x01);
+	// if (ret < 0)
+	// 	return ret;
+	
+
+	return len;
+}
+
+static IIO_DEVICE_ATTR(vco_band, 0444,
+		       admv4420_vco_band, NULL, 0);
+
 static IIO_DEVICE_ATTR(beam0_update, 0644,
 		       admv4420_update_show, admv4420_update_store, 0);
 
@@ -314,6 +386,23 @@ static const struct iio_info admv4420_info = {
 	.attrs = &admv4420_attribute_group,
 };
 
+static int admv4420_dt_parse(struct admv4420_state *st)
+{
+	int ret;
+	struct spi_device *spi = st->spi;
+
+	of_property_read_u32(spi->dev.of_node, "adi,ref_type", &st->ref_block.type);
+	st->ref_block.doubler_en = of_property_read_bool(spi->dev.of_node, "adi,ref_doubler_en");
+	st->ref_block.divede_by_2_en = of_property_read_bool(spi->dev.of_node, "adi,ref_divede_by_2_en");
+	ret = of_property_read_u32(spi->dev.of_node, "adi,ref_diveder", &st->ref_block.diveder);
+	if (ret < 0)
+		pr_err("%s: %d: %x admv4420_dt_parse\n", __func__, __LINE__, st->ref_block.diveder);
+
+	pr_err("%s: %d: %x admv4420_dt_parse\n", __func__, __LINE__, st->ref_block.diveder);
+
+	return 0;
+}
+
 static int admv4420_setup(struct iio_dev *indio_dev)
 {
 	struct admv4420_state *st = iio_priv(indio_dev);
@@ -321,12 +410,15 @@ static int admv4420_setup(struct iio_dev *indio_dev)
 	int ret;
 	pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 	/* Software reset and activate SDO */
-	
-	ret = regmap_write(st->regmap, 0x0A, 0xAD);
+	ret = regmap_write(st->regmap, ADMV4420_SPI_CONFIG_1, 0x81);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(st->regmap, ADMV4420_SCRATCHPAD, 0xAD);
 	if (ret < 0)
 		return ret;
 pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
-	ret = regmap_read(st->regmap, 0x0A, &val);
+	ret = regmap_read(st->regmap, ADMV4420_SCRATCHPAD, &val);
 	if (ret < 0)
 		return ret;
 
@@ -337,11 +429,11 @@ pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 		return -EIO;
 	}
 
-	ret = regmap_write(st->regmap, 0x0A, 0x5A);
+	ret = regmap_write(st->regmap, ADMV4420_SCRATCHPAD, 0x5A);
 	if (ret < 0)
 		return ret;
 pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
-	ret = regmap_read(st->regmap, 0x0A, &val);
+	ret = regmap_read(st->regmap, ADMV4420_SCRATCHPAD, &val);
 	if (ret < 0)
 		return ret;
 
@@ -352,7 +444,106 @@ pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 		return -EIO;
 	}
 	dev_err(indio_dev->dev.parent, "ADMV4420 to read/write scratchpad %x ", val);
-	
+
+	st->ref_block.freq_hz = 50000000;
+	st->ref_block.type = ADMV4420_XTAL;
+	st->ref_block.doubler_en = false;
+	st->ref_block.divede_by_2_en = false;
+	st->ref_block.diveder = 1;
+
+	st->n_counter.int_val = 0xA7;
+	st->n_counter.frac_val = 0x02;
+	st->n_counter.mod_val = 0x04;
+
+	st->pump.state = ADMV4420_CHARGE_PUMP_NORMAL_OP;
+	st->pump.current_uA = 3;
+	st->pump.bleed_en = 1;
+	st->pump.bleed_current_uA = 0x0C;
+
+	// admv4420_dt_parse(st);
+
+	pr_err("%s: %d: admv4420_setup %x\n", __func__, __LINE__, st->ref_block.diveder);
+	ret = regmap_write(st->regmap, ADMV4420_R_DIV_L,
+			   FIELD_GET(0xFF, st->ref_block.diveder));
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(st->regmap, ADMV4420_R_DIV_H,
+			   FIELD_GET(0xFF00, st->ref_block.diveder));
+	if (ret < 0)
+		return ret;
+	pr_err("%s: %d: admv4420_setup %x %x %x %x\n", __func__, __LINE__, st->ref_block.divede_by_2_en, ADMV4420_REFERENCE_IN_MODE(st->ref_block.type), ADMV4420_REFERENCE_DOUBLER(st->ref_block.doubler_en),
+		st->ref_block.divede_by_2_en |
+			   ADMV4420_REFERENCE_IN_MODE(st->ref_block.type) |
+			   ADMV4420_REFERENCE_DOUBLER(st->ref_block.doubler_en)
+	);
+	ret = regmap_write(st->regmap, ADMV4420_REFERENCE,
+			   st->ref_block.divede_by_2_en |
+			   ADMV4420_REFERENCE_IN_MODE(st->ref_block.type) |
+			   ADMV4420_REFERENCE_DOUBLER(st->ref_block.doubler_en));
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(st->regmap, ADMV4420_FRAC_L,
+			   FIELD_GET(0xFF, st->n_counter.frac_val));
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(st->regmap, ADMV4420_FRAC_M,
+			   FIELD_GET(0xFF00, st->n_counter.frac_val));
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(st->regmap, ADMV4420_FRAC_H,
+			   FIELD_GET(0xFF0000, st->n_counter.frac_val));
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(st->regmap, ADMV4420_MOD_L,
+			   FIELD_GET(0xFF, st->n_counter.mod_val));
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(st->regmap, ADMV4420_MOD_H,
+			   FIELD_GET(0x0300, st->n_counter.mod_val));
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(st->regmap, ADMV4420_INT_L,
+			   FIELD_GET(0xFF, st->n_counter.int_val));
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(st->regmap, ADMV4420_INT_H,
+			   FIELD_GET(0xFF00, st->n_counter.int_val));
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(st->regmap, ADMV4420_PLL_MUX_SEL, ADMV4420_HIGH);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_update_bits(st->regmap, ADMV4420_CP_STATE, 0x03, st->pump.state);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(st->regmap, ADMV4420_CP_BLEED_EN, st->pump.bleed_en);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(st->regmap, ADMV4420_CP_CURRENT, st->pump.current_uA);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(st->regmap, ADMV4420_CP_BLEED, st->pump.bleed_current_uA);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(st->regmap, ADMV4420_ENABLES, ENABLE_PLL | ENABLE_LO | ENABLE_VCO |
+			   ENABLE_IFAMP | ENABLE_MIXER | ENABLE_LNA);
+	if (ret < 0)
+		return ret;
+
 	return 0;
 }
 
