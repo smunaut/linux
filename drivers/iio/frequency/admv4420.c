@@ -70,6 +70,16 @@
 #define ENABLE_MIXER				BIT(1)
 #define ENABLE_LNA				BIT(0)
 
+enum admv4420_option_st {
+	ADMV4420_DISABLED,
+	ADMV4420_ENABLED,
+};
+
+enum admv4420_ref_op {
+	ADMV4420_DOUBLER,
+	ADMV4420_DIVIDE_BY_2,
+};
+
 enum admv4420_mux_sel {
 	ADMV4420_LOW = 0,
 	ADMV4420_LOCK_DTCT = 1,
@@ -90,26 +100,32 @@ enum admv4420_charge_pump_st {
 	ADMV4420_CHARGE_PUMP_NORMAL_OP,
 };
 
+enum admv4420_n_counter_par {
+	ADMV4420_N_COUNTER_INT,
+	ADMV4420_N_COUNTER_FRAC,
+	ADMV4420_N_COUNTER_MOD,
+};
+
 struct admv4420_reference_block {
-	unsigned int freq_hz;
-	enum admv4420_ref_type type;
 	bool doubler_en;
 	bool divede_by_2_en;
-	unsigned int diveder;
+	enum admv4420_ref_type type;
+	u32 freq_hz;
+	u32 diveder;
 };
 
 struct admv4420_n_counter {
-	u16 int_val;
-	unsigned int frac_val;
-	unsigned int mod_val;
-	unsigned long int n_counter;
+	u32 int_val;
+	u32 frac_val;
+	u32 mod_val;
+	u32 n_counter;
 };
 
 struct admv4420_charge_pump {
-	enum admv4420_charge_pump_st state;
-	unsigned int current_uA;
 	bool bleed_en;
-	unsigned int bleed_current_uA;
+	enum admv4420_charge_pump_st state;
+	u32 current_uA;
+	u32 bleed_current_uA;
 };
 
 struct admv4420_state {
@@ -121,7 +137,26 @@ struct admv4420_state {
 	struct admv4420_reference_block ref_block;
 	struct admv4420_n_counter	n_counter;
 	struct admv4420_charge_pump	pump;
+	enum admv4420_mux_sel		mux_sel;
 	u8				beam_index[ADAR300x_MAX_RAM_STATES];
+};
+
+static const char *const admv4420_op_state[] = {
+	[ADMV4420_DISABLED] = "disabled",
+	[ADMV4420_ENABLED] = "enabled",
+};
+
+static const char *const admv4420_ref_type_str[] = {
+	[ADMV4420_XTAL] = "XTAL",
+	[ADMV4420_SINGLE_ENDED] = "single_ended",
+};
+
+static const char *const admv4420_mux_sel_str[] = {
+	[ADMV4420_LOW] = "LOW",
+	[ADMV4420_LOCK_DTCT] = "LOCK_DTCT",
+	[ADMV4420_R_COUNTER_PER_2] = "R_COUNTER_PER_2",
+	[ADMV4420_N_CONUTER_PER_2] = "N_CONUTER_PER_2",
+	[ADMV4420_HIGH] = "HIGH",
 };
 
 static const struct regmap_config admv4420_regmap_config = {
@@ -130,31 +165,6 @@ static const struct regmap_config admv4420_regmap_config = {
 	.read_flag_mask = BIT(7),
 };
 
-static int admv4420_reg_read(struct admv4420_state *st, u32 reg, u32 *val)
-{
-	return regmap_read(st->regmap, reg, val);
-}
-
-static int admv4420_reg_write(struct admv4420_state *st, u32 reg, u32 val)
-{
-	return regmap_write(st->regmap, reg, val);
-}
-
-static int admv4420_reg_update(struct admv4420_state *st, u32 reg, u32 mask, u32 val)
-{
-	int ret;
-	u32 readval;
-
-	ret = admv4420_reg_read(st, reg, &readval);
-	if (ret < 0)
-		return ret;
-
-	readval &= ~mask;
-	readval |= val;
-
-	return admv4420_reg_write(st, reg, val);
-}
-
 static int admv4420_reg_access(struct iio_dev *indio_dev,
 			       u32 reg, u32 writeval,
 			       u32 *readval)
@@ -162,58 +172,9 @@ static int admv4420_reg_access(struct iio_dev *indio_dev,
 	struct admv4420_state *st = iio_priv(indio_dev);
 
 	if (readval)
-		return admv4420_reg_read(st, reg, readval);
+		return regmap_read(st->regmap, reg, readval);
 	else
-		return admv4420_reg_write(st, reg, writeval);
-}
-
-static int admv4420_read_raw(struct iio_dev *indio_dev,
-			     struct iio_chan_spec const *chan,
-			     int *val, int *val2, long m)
-{
-	// struct admv4420_state *st = iio_priv(indio_dev);
-	// int ret, ch;
-
-	switch (m) {
-	case IIO_CHAN_INFO_RAW:
-		return IIO_VAL_INT;
-	case IIO_CHAN_INFO_HARDWAREGAIN:
-		return IIO_VAL_INT_PLUS_MICRO_DB;
-	case IIO_CHAN_INFO_PHASE:
-		return IIO_VAL_INT;
-	default:
-		return -EINVAL;
-	}
-};
-
-static int admv4420_write_raw(struct iio_dev *indio_dev,
-			      struct iio_chan_spec const *chan,
-			      int val, int val2, long mask)
-{
-	// struct admv4420_state *st = iio_priv(indio_dev);
-	// u32 code;
-	// int ret;
-
-	switch (mask) {
-	case IIO_CHAN_INFO_HARDWAREGAIN:
-	case IIO_CHAN_INFO_PHASE:
-	default:
-		return -EINVAL;
-	};
-}
-
-static int admv4420_write_raw_get_fmt(struct iio_dev *indio_dev,
-				      struct iio_chan_spec const *chan,
-				      long mask)
-{
-	switch (mask) {
-	case IIO_CHAN_INFO_HARDWAREGAIN:
-		return IIO_VAL_INT_PLUS_MICRO_DB;
-	case IIO_CHAN_INFO_PHASE:
-		return IIO_VAL_INT_PLUS_MICRO;
-	default:
-		return -EINVAL;
-	}
+		return regmap_write(st->regmap, reg, writeval);
 }
 
 #define ADMV4420_CHANNEL(_num, name)				\
@@ -226,179 +187,343 @@ static int admv4420_write_raw_get_fmt(struct iio_dev *indio_dev,
 	.extend_name = name,					\
 }
 
+static ssize_t admv4420_mux_sel_show_available(struct device *dev,
+					   struct device_attribute *attr,
+					   char *buf)
+{
+	size_t len = 0;
+	int i;
 
-static ssize_t admv4420_update_show(struct device *dev,
-			      struct device_attribute *attr,
-			      char *buf)
+	for (i = 0; i < ARRAY_SIZE(admv4420_mux_sel_str); ++i) {
+		if (admv4420_mux_sel_str[i])
+			len += sprintf(buf + len, "%s ", admv4420_mux_sel_str[i]);
+	}
+
+	return len;
+}
+
+static ssize_t admv4420_mux_sel_show(struct device *dev,
+				 struct device_attribute *attr,
+				 char *buf)
 {
 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
 	struct admv4420_state *st = iio_priv(indio_dev);
-	struct iio_dev_attr *this_attr = to_iio_dev_attr(attr);
-	int ret, beam;
-	u32 readval;
-
-	beam = this_attr->address;
-	readval = st->beam_index[beam];
-
-	ret = sprintf(buf, "%d\n", readval);
-
-	return ret;
+	
+	return sprintf(buf, "%s\n", admv4420_mux_sel_str[st->mux_sel]);
 }
 
-static ssize_t admv4420_update_store(struct device *dev,
+static ssize_t admv4420_mux_sel_store(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf, size_t len)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct admv4420_state *st = iio_priv(indio_dev);
+	int i, mode;
+
+	for (i = 0; i < ARRAY_SIZE(admv4420_mux_sel_str); ++i) {
+		if (admv4420_mux_sel_str[i] && sysfs_streq(buf, admv4420_mux_sel_str[i])) {
+			mode = i;
+			break;
+		}
+	}
+	st->mux_sel = mode;
+
+	return len;
+}
+
+static ssize_t admv4420_ref_type_show_available(struct device *dev,
+					   struct device_attribute *attr,
+					   char *buf)
+{
+	size_t len = 0;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(admv4420_ref_type_str); ++i) {
+		if (admv4420_ref_type_str[i])
+			len += sprintf(buf + len, "%s ", admv4420_ref_type_str[i]);
+	}
+
+	return len;
+}
+
+static ssize_t admv4420_ref_type_show(struct device *dev,
+				 struct device_attribute *attr,
+				 char *buf)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct admv4420_state *st = iio_priv(indio_dev);
+	
+	return sprintf(buf, "%s\n", admv4420_ref_type_str[st->ref_block.type]);
+}
+
+static ssize_t admv4420_ref_type_store(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf, size_t len)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct admv4420_state *st = iio_priv(indio_dev);
+	int i, mode;
+
+	for (i = 0; i < ARRAY_SIZE(admv4420_ref_type_str); ++i) {
+		if (admv4420_ref_type_str[i] && sysfs_streq(buf, admv4420_ref_type_str[i])) {
+			mode = i;
+			break;
+		}
+	}
+	st->ref_block.type = mode;
+
+	return len;
+}
+
+static ssize_t admv4420_ref_doubler_show_available(struct device *dev,
+					   struct device_attribute *attr,
+					   char *buf)
+{
+	size_t len = 0;
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(admv4420_op_state); ++i) {
+		if (admv4420_op_state[i])
+			len += sprintf(buf + len, "%s ", admv4420_op_state[i]);
+	}
+
+	return len;
+}
+
+static ssize_t admv4420_ref_doubler_show(struct device *dev,
+				 struct device_attribute *attr,
+				 char *buf)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct iio_dev_attr *this_attr = to_iio_dev_attr(attr);
+	struct admv4420_state *st = iio_priv(indio_dev);
+	switch(this_attr->address) {
+	case ADMV4420_DOUBLER:
+		return sprintf(buf, "%s\n", admv4420_op_state[st->ref_block.doubler_en]);
+	case ADMV4420_DIVIDE_BY_2:
+		return sprintf(buf, "%s\n", admv4420_op_state[st->ref_block.divede_by_2_en]);
+	default:
+		return -EINVAL;
+	}
+}
+
+static ssize_t admv4420_ref_doubler_store(struct device *dev,
 			      struct device_attribute *attr,
 			      const char *buf, size_t len)
 {
 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
 	struct iio_dev_attr *this_attr = to_iio_dev_attr(attr);
 	struct admv4420_state *st = iio_priv(indio_dev);
-	u8 readval;
-	int ret = 0, beam;
+	int i, mode;
 
-	beam = this_attr->address;
-	ret = kstrtou8(buf, 10, &readval);
-	if (readval > (ADAR300x_MAX_RAM_STATES - 1))
+	for (i = 0; i < ARRAY_SIZE(admv4420_op_state); ++i) {
+		if (admv4420_op_state[i] && sysfs_streq(buf, admv4420_op_state[i])) {
+			mode = i;
+			break;
+		}
+	}
+	switch(this_attr->address) {
+	case ADMV4420_DOUBLER:
+		st->ref_block.doubler_en = mode;
+		break;
+	case ADMV4420_DIVIDE_BY_2:
+		st->ref_block.divede_by_2_en = mode;
+		break;
+	default:
 		return -EINVAL;
-
-	st->beam_index[beam] = readval;
+	}
 
 	return len;
 }
 
-static ssize_t admv4420_vco_band(struct device *dev,
+static ssize_t admv4420_n_counter_show(struct device *dev,
 				 struct device_attribute *attr,
 				 char *buf)
 {
-	u32 val = 0;
-	size_t len = 0;
-	int i;
+	struct iio_dev_attr *this_attr = to_iio_dev_attr(attr);
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct admv4420_state *st = iio_priv(indio_dev);
 
+	switch(this_attr->address) {
+	case ADMV4420_N_COUNTER_INT:
+		return sprintf(buf, "%d\n", st->n_counter.int_val);
+	case ADMV4420_N_COUNTER_FRAC:
+		return sprintf(buf, "%d\n", st->n_counter.frac_val);
+	case ADMV4420_N_COUNTER_MOD:
+		return sprintf(buf, "%d\n", st->n_counter.mod_val);
+	default:
+		return -EINVAL;
+	}
+}
 
-	// ret = regmap_write(st->regmap, ADMV4420_VCO_READBACK_SEL, 0x04);
-	// if (ret < 0)
-	// 	return ret;
+static ssize_t admv4420_n_counter_store(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf, size_t len)
+{
+	struct iio_dev_attr *this_attr = to_iio_dev_attr(attr);
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct admv4420_state *st = iio_priv(indio_dev);
+	u32 readval;
+	int ret = 0;
 
-	// ret = regmap_read(st->regmap, ADMV4420_VCO_DATA_READBACK1, &val);
-	// if (ret < 0)
-	// 	return ret;
-	
-	// ret = regmap_write(st->regmap, ADMV4420_VCO_READBACK_SEL, 0x01);
-	// if (ret < 0)
-	// 	return ret;
-	
+	ret = kstrtou32(buf, 10, &readval);
+	if (ret)
+		return ret;
+
+	switch(this_attr->address) {
+	case ADMV4420_N_COUNTER_INT:
+		st->n_counter.int_val = readval;
+		break;
+	case ADMV4420_N_COUNTER_FRAC:
+		st->n_counter.frac_val = readval;
+		break;
+	case ADMV4420_N_COUNTER_MOD:
+		st->n_counter.mod_val = readval;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return len;
+}
+	// of_property_read_u32(spi->dev.of_node, "adi,ref_diveder", &st->ref_block.diveder);
+
+static ssize_t admv4420_ref_divider_show(struct device *dev,
+				 struct device_attribute *attr,
+				 char *buf)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct admv4420_state *st = iio_priv(indio_dev);
+
+	return sprintf(buf, "%d\n", st->ref_block.diveder);
+}
+
+static ssize_t admv4420_ref_divider_store(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf, size_t len)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct admv4420_state *st = iio_priv(indio_dev);
+	u32 readval;
+	int ret = 0;
+
+	ret = kstrtou32(buf, 10, &readval);
+	if (ret)
+		return ret;
+
+	st->ref_block.diveder = readval;
 
 	return len;
 }
 
-static IIO_DEVICE_ATTR(vco_band, 0444,
-		       admv4420_vco_band, NULL, 0);
+static ssize_t admv4420_ref_freq_show(struct device *dev,
+				 struct device_attribute *attr,
+				 char *buf)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct admv4420_state *st = iio_priv(indio_dev);
+	
+	return sprintf(buf, "%d\n", st->ref_block.freq_hz);
+}
 
-static IIO_DEVICE_ATTR(beam0_update, 0644,
-		       admv4420_update_show, admv4420_update_store, 0);
+static ssize_t admv4420_ref_freq_store(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf, size_t len)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct admv4420_state *st = iio_priv(indio_dev);
+	u32 readval;
+	int ret = 0;
+
+	ret = kstrtou32(buf, 10, &readval);
+	if (ret)
+		return ret;
+
+	st->ref_block.freq_hz = readval;
+
+	return len;
+}
+
+static ssize_t admv4420_vco_freq_show(struct device *dev,
+				 struct device_attribute *attr,
+				 char *buf)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct admv4420_state *st = iio_priv(indio_dev);
+
+	return sprintf(buf, "%ld\n", st->vco_freq_hz);
+}
+
+static ssize_t admv4420_lo_freq_show(struct device *dev,
+				 struct device_attribute *attr,
+				 char *buf)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct admv4420_state *st = iio_priv(indio_dev);
+
+	return sprintf(buf, "%ld\n", st->lo_freq_hz);
+}
+
+static IIO_DEVICE_ATTR(ref_freq, 0644, admv4420_ref_freq_show, admv4420_ref_freq_store, 0);
+static IIO_DEVICE_ATTR(vco_freq, 0444, admv4420_vco_freq_show, NULL, 0);
+static IIO_DEVICE_ATTR(lo_freq, 0444, admv4420_lo_freq_show, NULL, 0);
+static IIO_DEVICE_ATTR(ref_doubler, 0644, admv4420_ref_doubler_show, admv4420_ref_doubler_store, ADMV4420_DOUBLER);
+static IIO_DEVICE_ATTR(ref_divide_by_2, 0644, admv4420_ref_doubler_show, admv4420_ref_doubler_store, ADMV4420_DIVIDE_BY_2);
+static IIO_DEVICE_ATTR(ref_type, 0644, admv4420_ref_type_show, admv4420_ref_type_store, ADMV4420_DIVIDE_BY_2);
+static IIO_DEVICE_ATTR(ref_divider, 0644, admv4420_ref_divider_show, admv4420_ref_divider_store, 0);
+static IIO_DEVICE_ATTR(mux_sel, 0644, admv4420_mux_sel_show, admv4420_mux_sel_store, 0);
+static IIO_DEVICE_ATTR(n_counter_int_val, 0644, admv4420_n_counter_show, admv4420_n_counter_store, ADMV4420_N_COUNTER_INT);
+static IIO_DEVICE_ATTR(n_counter_frac_val, 0644, admv4420_n_counter_show, admv4420_n_counter_store, ADMV4420_N_COUNTER_FRAC);
+static IIO_DEVICE_ATTR(n_counter_mod_val, 0644, admv4420_n_counter_show, admv4420_n_counter_store, ADMV4420_N_COUNTER_MOD);
+static IIO_DEVICE_ATTR(ref_doubler_available, 0444, admv4420_ref_doubler_show_available, NULL, 0);
+static IIO_DEVICE_ATTR(ref_divider_available, 0444, admv4420_ref_doubler_show_available, NULL, 0);
+static IIO_DEVICE_ATTR(ref_type_available, 0444, admv4420_ref_type_show_available, NULL, 0);
+static IIO_DEVICE_ATTR(mux_sel_available, 0444, admv4420_mux_sel_show_available, NULL, 0);
 
 static struct attribute *admv4420_attributes[] = {
-	&iio_dev_attr_beam0_update.dev_attr.attr,
+	&iio_dev_attr_ref_freq.dev_attr.attr,
+	&iio_dev_attr_vco_freq.dev_attr.attr,
+	&iio_dev_attr_lo_freq.dev_attr.attr,
+	&iio_dev_attr_ref_doubler.dev_attr.attr,
+	&iio_dev_attr_ref_divide_by_2.dev_attr.attr,
+	&iio_dev_attr_ref_type.dev_attr.attr,
+	&iio_dev_attr_mux_sel.dev_attr.attr,
+	&iio_dev_attr_ref_divider.dev_attr.attr,
+	&iio_dev_attr_n_counter_int_val.dev_attr.attr,
+	&iio_dev_attr_n_counter_frac_val.dev_attr.attr,
+	&iio_dev_attr_n_counter_mod_val.dev_attr.attr,
+	&iio_dev_attr_ref_doubler_available.dev_attr.attr,
+	&iio_dev_attr_ref_divider_available.dev_attr.attr,
+	&iio_dev_attr_ref_type_available.dev_attr.attr,
+	&iio_dev_attr_mux_sel_available.dev_attr.attr,
 	NULL,
 };
 
 static const struct attribute_group admv4420_attribute_group = {
 	.attrs = admv4420_attributes,
 };
-/* Maybe ditch the entire channel to element mapping and just use the
- * beamstates as a reference attribute. Suggestion may include a new type of
- * raw value similar go hardwaregain, phase -> beamstate */
-#define DECLARE_admv4420_CHANNELS(name)				\
-static const struct iio_chan_spec name[] = {			\
-	ADMV4420_CHANNEL(0, "BEAM0_EL0"),			\
-	ADMV4420_CHANNEL(1, "BEAM0_EL1"),			\
-	ADMV4420_CHANNEL(2, "BEAM0_EL2"),			\
-	ADMV4420_CHANNEL(3, "BEAM0_EL3"),			\
-	ADMV4420_CHANNEL(4, "BEAM1_EL0"),			\
-	ADMV4420_CHANNEL(5, "BEAM1_EL1"),			\
-	ADMV4420_CHANNEL(6, "BEAM1_EL2"),			\
-	ADMV4420_CHANNEL(7, "BEAM1_EL3"),			\
-	ADMV4420_CHANNEL(8, "BEAM2_EL0"),			\
-	ADMV4420_CHANNEL(9, "BEAM2_EL1"),			\
-	ADMV4420_CHANNEL(10, "BEAM2_EL2"),			\
-	ADMV4420_CHANNEL(11, "BEAM2_EL3"),			\
-	ADMV4420_CHANNEL(12, "BEAM3_EL0"),			\
-	ADMV4420_CHANNEL(13, "BEAM3_EL1"),			\
-	ADMV4420_CHANNEL(14, "BEAM3_EL2"),			\
-	ADMV4420_CHANNEL(15, "BEAM3_EL3"),			\
-};
-
-
-DECLARE_admv4420_CHANNELS(admv4420_channels);
-
-
-static ssize_t admv4420_beam_mode_read(struct iio_dev *indio_dev,
-				    uintptr_t private,
-				    const struct iio_chan_spec *chan, char *buf)
-{
-	struct admv4420_state *st = iio_device_get_drvdata(indio_dev);
-	u32 readval;
-	int ret;
-
-	ret = admv4420_reg_read(st, 0x0a, &readval);
-	if (ret <0)
-		return ret;
-
-	return sprintf(buf, "%d\n", readval);
-}
-
-static ssize_t admv4420_beam_mode_write(struct iio_dev *indio_dev,
-				     uintptr_t private,
-				     const struct iio_chan_spec *chan,
-				     const char *buf, size_t len)
-{
-	struct admv4420_state *st = iio_priv(indio_dev);
-	u8 readin;
-	int ret;
-	ret = kstrtou8(buf, 10, &readin);
-	if (ret)
-		return ret;
-
-	ret = admv4420_reg_write(st, 0x0a, readin); 
-
-	return ret ? ret : len;
-}
-
-// static struct iio_chan_spec_ext_info admv4420_ext_info[] = {
-// 	{
-// 	 .name = "mode_ctrl",
-// 	 .read = admv4420_beam_mode_read,
-// 	 .write = admv4420_beam_mode_write,
-// 	 .shared = IIO_SHARED_BY_TYPE,
-// 	 },
-// 	{
-// 	 .name = "mode_ctrl_available",
-// 	 .read = admv4420_beam_mode_available,
-// 	 .shared = IIO_SHARED_BY_TYPE,
-// 	 },
-// 	{},
-// };
 
 static const struct iio_info admv4420_info = {
-	.read_raw = &admv4420_read_raw,
-	.write_raw = &admv4420_write_raw,
-	.write_raw_get_fmt = &admv4420_write_raw_get_fmt,
 	.debugfs_reg_access = &admv4420_reg_access,
 	.attrs = &admv4420_attribute_group,
 };
 
 static int admv4420_dt_parse(struct admv4420_state *st)
 {
-	int ret;
 	struct spi_device *spi = st->spi;
 
+	of_property_read_u32(spi->dev.of_node, "adi,ref_freq_hz", &st->ref_block.freq_hz);
 	of_property_read_u32(spi->dev.of_node, "adi,ref_type", &st->ref_block.type);
 	st->ref_block.doubler_en = of_property_read_bool(spi->dev.of_node, "adi,ref_doubler_en");
-	st->ref_block.divede_by_2_en = of_property_read_bool(spi->dev.of_node, "adi,ref_divede_by_2_en");
-	ret = of_property_read_u32(spi->dev.of_node, "adi,ref_diveder", &st->ref_block.diveder);
-	if (ret < 0)
-		pr_err("%s: %d: %x admv4420_dt_parse\n", __func__, __LINE__, st->ref_block.diveder);
+	st->ref_block.divede_by_2_en = of_property_read_bool(spi->dev.of_node,
+							     "adi,ref_divede_by_2_en");
+	of_property_read_u32(spi->dev.of_node, "adi,ref_diveder", &st->ref_block.diveder);
+	
+	of_property_read_u32(spi->dev.of_node, "adi,N_counter_int_val", &st->n_counter.int_val);
+	of_property_read_u32(spi->dev.of_node, "adi,N_counter_frac_val", &st->n_counter.frac_val);
+	of_property_read_u32(spi->dev.of_node, "adi,N_counter_mod_val", &st->n_counter.mod_val);
 
-	pr_err("%s: %d: %x admv4420_dt_parse\n", __func__, __LINE__, st->ref_block.diveder);
+	of_property_read_u32(spi->dev.of_node, "adi,mux_sel", &st->mux_sel);
 
 	return 0;
 }
@@ -459,8 +584,9 @@ pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 	st->pump.current_uA = 3;
 	st->pump.bleed_en = 1;
 	st->pump.bleed_current_uA = 0x0C;
+	st->mux_sel = ADMV4420_LOCK_DTCT;
 
-	// admv4420_dt_parse(st);
+	admv4420_dt_parse(st);
 
 	pr_err("%s: %d: admv4420_setup %x\n", __func__, __LINE__, st->ref_block.diveder);
 	ret = regmap_write(st->regmap, ADMV4420_R_DIV_L,
@@ -519,7 +645,7 @@ pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 	if (ret < 0)
 		return ret;
 
-	ret = regmap_write(st->regmap, ADMV4420_PLL_MUX_SEL, ADMV4420_HIGH);
+	ret = regmap_write(st->regmap, ADMV4420_PLL_MUX_SEL, st->mux_sel);
 	if (ret < 0)
 		return ret;
 

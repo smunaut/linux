@@ -16,6 +16,7 @@
 				spi-max-frequency = <1000000>;
 
 				/* reference block config */
+				adi,ref_freq_hz = <50000000>;
 				adi,ref_type = <0>;
 				// adi,ref_doubler_en;
 				// adi,ref_divede_by_2_en;
@@ -31,6 +32,8 @@
 				adi,charge_pump_current_uA = <3>;
 				adi,charge_pump_bleed_en = <1>;
 				adi,charge_pump_bleed_current_uA = <0x0C>;
+
+				adi,mux_sel = <4>;
 			};
 		};
 	};
