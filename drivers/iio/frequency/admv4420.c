@@ -58,8 +58,6 @@
 #define ADMV4420_CP_CURRENT			0x22E
 #define ADMV4420_CP_BLEED			0x22F
 
-#define ADAR300x_MAX_RAM_STATES 4
-
 #define ADMV4420_REFERENCE_IN_MODE(x)		(x << 1)
 #define ADMV4420_REFERENCE_DOUBLER(x)		(x << 2)
 
@@ -111,7 +109,7 @@ struct admv4420_reference_block {
 	bool divede_by_2_en;
 	enum admv4420_ref_type type;
 	u32 freq_hz;
-	u32 diveder;
+	u32 divider;
 };
 
 struct admv4420_n_counter {
@@ -131,14 +129,13 @@ struct admv4420_charge_pump {
 struct admv4420_state {
 	struct spi_device		*spi;
 	struct regmap			*regmap;
-	unsigned long int 		pfd_freq_hz;
-	unsigned long int 		vco_freq_hz;
-	unsigned long int 		lo_freq_hz;
+	u64		 		pfd_freq_hz;
+	u64 				vco_freq_hz;
+	u64 				lo_freq_hz;
 	struct admv4420_reference_block ref_block;
 	struct admv4420_n_counter	n_counter;
 	struct admv4420_charge_pump	pump;
 	enum admv4420_mux_sel		mux_sel;
-	u8				beam_index[ADAR300x_MAX_RAM_STATES];
 };
 
 static const char *const admv4420_op_state[] = {
@@ -177,15 +174,32 @@ static int admv4420_reg_access(struct iio_dev *indio_dev,
 		return regmap_write(st->regmap, reg, writeval);
 }
 
-#define ADMV4420_CHANNEL(_num, name)				\
-{								\
-	.type = IIO_VOLTAGE,					\
-	.indexed = 1,						\
-	.channel = (_num),					\
-	.info_mask_separate = BIT(IIO_CHAN_INFO_HARDWAREGAIN) | \
-		BIT(IIO_CHAN_INFO_PHASE),			\
-	.extend_name = name,					\
+static int admv4420_calc_vco_freq(struct admv4420_state *st)
+{
+	u64 tmp;
+
+	tmp = div_u64((st->pfd_freq_hz * st->n_counter.frac_val), st->n_counter.mod_val);
+	tmp += st->pfd_freq_hz * st->n_counter.int_val;
+	st->vco_freq_hz = tmp;
+
+	return 0;
 }
+
+static int admv4420_calc_pfd_freq(struct admv4420_state *st)
+{
+	u32 tmp;
+
+	tmp = st->ref_block.freq_hz * (st->ref_block.doubler_en ? 2 : 1);
+	tmp = DIV_ROUND_CLOSEST(tmp, st->ref_block.divider *
+				(st->ref_block.divede_by_2_en ? 2 : 1));
+	st->pfd_freq_hz = tmp;
+
+	admv4420_calc_vco_freq(st);
+	st->lo_freq_hz = st->vco_freq_hz * 2;
+
+	return 0;
+}
+
 
 static ssize_t admv4420_mux_sel_show_available(struct device *dev,
 					   struct device_attribute *attr,
@@ -333,6 +347,8 @@ static ssize_t admv4420_ref_doubler_store(struct device *dev,
 		return -EINVAL;
 	}
 
+	admv4420_calc_pfd_freq(st);
+
 	return len;
 }
 
@@ -383,10 +399,11 @@ static ssize_t admv4420_n_counter_store(struct device *dev,
 	default:
 		return -EINVAL;
 	}
+	admv4420_calc_vco_freq(st);
+	st->lo_freq_hz = st->vco_freq_hz * 2;
 
 	return len;
 }
-	// of_property_read_u32(spi->dev.of_node, "adi,ref_diveder", &st->ref_block.diveder);
 
 static ssize_t admv4420_ref_divider_show(struct device *dev,
 				 struct device_attribute *attr,
@@ -395,7 +412,7 @@ static ssize_t admv4420_ref_divider_show(struct device *dev,
 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
 	struct admv4420_state *st = iio_priv(indio_dev);
 
-	return sprintf(buf, "%d\n", st->ref_block.diveder);
+	return sprintf(buf, "%d\n", st->ref_block.divider);
 }
 
 static ssize_t admv4420_ref_divider_store(struct device *dev,
@@ -411,7 +428,9 @@ static ssize_t admv4420_ref_divider_store(struct device *dev,
 	if (ret)
 		return ret;
 
-	st->ref_block.diveder = readval;
+	st->ref_block.divider = readval;
+
+	admv4420_calc_pfd_freq(st);
 
 	return len;
 }
@@ -440,6 +459,7 @@ static ssize_t admv4420_ref_freq_store(struct device *dev,
 		return ret;
 
 	st->ref_block.freq_hz = readval;
+	admv4420_calc_pfd_freq(st);
 
 	return len;
 }
@@ -451,7 +471,7 @@ static ssize_t admv4420_vco_freq_show(struct device *dev,
 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
 	struct admv4420_state *st = iio_priv(indio_dev);
 
-	return sprintf(buf, "%ld\n", st->vco_freq_hz);
+	return sprintf(buf, "%llu\n", st->vco_freq_hz);
 }
 
 static ssize_t admv4420_lo_freq_show(struct device *dev,
@@ -461,12 +481,23 @@ static ssize_t admv4420_lo_freq_show(struct device *dev,
 	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
 	struct admv4420_state *st = iio_priv(indio_dev);
 
-	return sprintf(buf, "%ld\n", st->lo_freq_hz);
+	return sprintf(buf, "%llu\n", st->lo_freq_hz);
+}
+
+static ssize_t admv4420_pfd_freq_show(struct device *dev,
+				 struct device_attribute *attr,
+				 char *buf)
+{
+	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
+	struct admv4420_state *st = iio_priv(indio_dev);
+
+	return sprintf(buf, "%llu\n", st->pfd_freq_hz);
 }
 
 static IIO_DEVICE_ATTR(ref_freq, 0644, admv4420_ref_freq_show, admv4420_ref_freq_store, 0);
 static IIO_DEVICE_ATTR(vco_freq, 0444, admv4420_vco_freq_show, NULL, 0);
 static IIO_DEVICE_ATTR(lo_freq, 0444, admv4420_lo_freq_show, NULL, 0);
+static IIO_DEVICE_ATTR(pfd_freq, 0444, admv4420_pfd_freq_show, NULL, 0);
 static IIO_DEVICE_ATTR(ref_doubler, 0644, admv4420_ref_doubler_show, admv4420_ref_doubler_store, ADMV4420_DOUBLER);
 static IIO_DEVICE_ATTR(ref_divide_by_2, 0644, admv4420_ref_doubler_show, admv4420_ref_doubler_store, ADMV4420_DIVIDE_BY_2);
 static IIO_DEVICE_ATTR(ref_type, 0644, admv4420_ref_type_show, admv4420_ref_type_store, ADMV4420_DIVIDE_BY_2);
@@ -476,7 +507,7 @@ static IIO_DEVICE_ATTR(n_counter_int_val, 0644, admv4420_n_counter_show, admv442
 static IIO_DEVICE_ATTR(n_counter_frac_val, 0644, admv4420_n_counter_show, admv4420_n_counter_store, ADMV4420_N_COUNTER_FRAC);
 static IIO_DEVICE_ATTR(n_counter_mod_val, 0644, admv4420_n_counter_show, admv4420_n_counter_store, ADMV4420_N_COUNTER_MOD);
 static IIO_DEVICE_ATTR(ref_doubler_available, 0444, admv4420_ref_doubler_show_available, NULL, 0);
-static IIO_DEVICE_ATTR(ref_divider_available, 0444, admv4420_ref_doubler_show_available, NULL, 0);
+static IIO_DEVICE_ATTR(ref_divide_by_2_available, 0444, admv4420_ref_doubler_show_available, NULL, 0);
 static IIO_DEVICE_ATTR(ref_type_available, 0444, admv4420_ref_type_show_available, NULL, 0);
 static IIO_DEVICE_ATTR(mux_sel_available, 0444, admv4420_mux_sel_show_available, NULL, 0);
 
@@ -484,6 +515,7 @@ static struct attribute *admv4420_attributes[] = {
 	&iio_dev_attr_ref_freq.dev_attr.attr,
 	&iio_dev_attr_vco_freq.dev_attr.attr,
 	&iio_dev_attr_lo_freq.dev_attr.attr,
+	&iio_dev_attr_pfd_freq.dev_attr.attr,
 	&iio_dev_attr_ref_doubler.dev_attr.attr,
 	&iio_dev_attr_ref_divide_by_2.dev_attr.attr,
 	&iio_dev_attr_ref_type.dev_attr.attr,
@@ -493,7 +525,7 @@ static struct attribute *admv4420_attributes[] = {
 	&iio_dev_attr_n_counter_frac_val.dev_attr.attr,
 	&iio_dev_attr_n_counter_mod_val.dev_attr.attr,
 	&iio_dev_attr_ref_doubler_available.dev_attr.attr,
-	&iio_dev_attr_ref_divider_available.dev_attr.attr,
+	&iio_dev_attr_ref_divide_by_2_available.dev_attr.attr,
 	&iio_dev_attr_ref_type_available.dev_attr.attr,
 	&iio_dev_attr_mux_sel_available.dev_attr.attr,
 	NULL,
@@ -517,7 +549,7 @@ static int admv4420_dt_parse(struct admv4420_state *st)
 	st->ref_block.doubler_en = of_property_read_bool(spi->dev.of_node, "adi,ref_doubler_en");
 	st->ref_block.divede_by_2_en = of_property_read_bool(spi->dev.of_node,
 							     "adi,ref_divede_by_2_en");
-	of_property_read_u32(spi->dev.of_node, "adi,ref_diveder", &st->ref_block.diveder);
+	of_property_read_u32(spi->dev.of_node, "adi,ref_divider", &st->ref_block.divider);
 	
 	of_property_read_u32(spi->dev.of_node, "adi,N_counter_int_val", &st->n_counter.int_val);
 	of_property_read_u32(spi->dev.of_node, "adi,N_counter_frac_val", &st->n_counter.frac_val);
@@ -574,7 +606,7 @@ pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 	st->ref_block.type = ADMV4420_XTAL;
 	st->ref_block.doubler_en = false;
 	st->ref_block.divede_by_2_en = false;
-	st->ref_block.diveder = 1;
+	st->ref_block.divider = 1;
 
 	st->n_counter.int_val = 0xA7;
 	st->n_counter.frac_val = 0x02;
@@ -588,14 +620,14 @@ pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 
 	admv4420_dt_parse(st);
 
-	pr_err("%s: %d: admv4420_setup %x\n", __func__, __LINE__, st->ref_block.diveder);
+	pr_err("%s: %d: admv4420_setup %x\n", __func__, __LINE__, st->ref_block.divider);
 	ret = regmap_write(st->regmap, ADMV4420_R_DIV_L,
-			   FIELD_GET(0xFF, st->ref_block.diveder));
+			   FIELD_GET(0xFF, st->ref_block.divider));
 	if (ret < 0)
 		return ret;
 
 	ret = regmap_write(st->regmap, ADMV4420_R_DIV_H,
-			   FIELD_GET(0xFF00, st->ref_block.diveder));
+			   FIELD_GET(0xFF00, st->ref_block.divider));
 	if (ret < 0)
 		return ret;
 	pr_err("%s: %d: admv4420_setup %x %x %x %x\n", __func__, __LINE__, st->ref_block.divede_by_2_en, ADMV4420_REFERENCE_IN_MODE(st->ref_block.type), ADMV4420_REFERENCE_DOUBLER(st->ref_block.doubler_en),
@@ -669,6 +701,8 @@ pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 			   ENABLE_IFAMP | ENABLE_MIXER | ENABLE_LNA);
 	if (ret < 0)
 		return ret;
+
+	admv4420_calc_pfd_freq(st);
 
 	return 0;
 }
