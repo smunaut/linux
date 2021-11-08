@@ -61,6 +61,33 @@ config ADXL345_SPI
 	  will be called adxl345_spi and you will also get adxl345_core
 	  for the core module.
 
+config ADXL367
+	tristate
+	select IIO_BUFFER
+	select IIO_TRIGGERED_BUFFER
+
+config ADXL367_SPI
+	tristate "Analog Devices ADXL367 3-Axis Accelerometer SPI Driver"
+	depends on SPI
+	select ADXL367
+	select REGMAP_SPI
+	help
+	  Say yes here to add support for the Analog Devices ADXL367 triaxial
+	  acceleration sensor.
+	  To compile this driver as a module, choose M here: the
+	  module will be called adxl367_spi.
+
+config ADXL367_I2C
+	tristate "Analog Devices ADXL367 3-Axis Accelerometer I2C Driver"
+	depends on I2C
+	select ADXL367
+	select REGMAP_I2C
+	help
+	  Say yes here to add support for the Analog Devices ADXL367 triaxial
+	  acceleration sensor.
+	  To compile this driver as a module, choose M here: the
+	  module will be called adxl367_i2c.
+
 config ADXL372
 	tristate
 	select IIO_BUFFER
