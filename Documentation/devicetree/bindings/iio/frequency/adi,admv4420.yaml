@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/iio/frequency/adi,admv4420.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: ADMV4420 K Band Downconverter
+
+maintainers:
+- Cristian Pop <cristian.pop@analog.com>
+
+description: |
+    The ADMV4420 is a highly integrated, double balanced, active
+    mixer with an integrated fractional-N synthesizer, ideally suited
+    for next generation K band satellite communications
+
+properties:
+  compatible:
+    enum:
+      - adi,admv4420
+
+  reg:
+    maxItems: 1
+
+  spi-max-frequency:
+    maximum: 1000000
+
+	adi,ref_type:
+    description: Reference clock type.
+    enum: [0, 1]
+
+  adi,ref_freq_hz:
+    description: Reference clock frequency.
+    $ref: /schemas/types.yaml#/definitions/uint32
+
+	adi,ref_doubler_en:
+    description: Reference divider multiplied by 2.
+    type: boolean
+
+	adi,ref_divede_by_2_en:
+    description: Reference divider divided by 2.
+    type: boolean
+
+	adi,ref_diveder:
+    description: Reference divider value.
+    $ref: /schemas/types.yaml#/definitions/uint32
+
+	adi,N_counter_int_val:
+    description: N counted int val.
+    $ref: /schemas/types.yaml#/definitions/uint32
+
+	adi,N_counter_frac_val:
+    description: N counted frac val.
+    $ref: /schemas/types.yaml#/definitions/uint32
+
+	adi,N_counter_mod_val:
+    description: N counted mod val.
+    $ref: /schemas/types.yaml#/definitions/uint32
+
+	adi,mux_sel:
+    description: Multiplexer output allows access to various internal signals.
+    enum: [0, 1, 4, 5, 8]
+
+required:
+- compatible
+- reg
+
+additionalProperties: false
+
+examples:
+- |
+    spi {
+      #address-cells = <1>;
+      #size-cells = <0>;
+      admv4420@0 {
+				compatible = "adi,admv4420";
+				reg = <0>;
+				spi-max-frequency = <1000000>;
+
+				/* reference block config */
+				adi,ref_freq_hz = <50000000>;
+				adi,ref_type = <0>;
+				adi,ref_diveder = <1>;
+
+				/* N counter config*/
+				adi,N_counter_int_val = <0xA7>;
+				adi,N_counter_frac_val = <0x02>;
+				adi,N_counter_mod_val = <0x04>;
+
+				adi,mux_sel = <1>;
+			};
+    };
+...
