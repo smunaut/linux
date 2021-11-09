@@ -27,13 +27,7 @@
 				adi,N_counter_frac_val = <0x02>;
 				adi,N_counter_mod_val = <0x04>;
 
-				/* charge pump config */
-				adi,charge_pump_st = <3>;
-				adi,charge_pump_current_uA = <3>;
-				adi,charge_pump_bleed_en = <1>;
-				adi,charge_pump_bleed_current_uA = <0x0C>;
-
-				adi,mux_sel = <4>;
+				adi,mux_sel = <1>;
 			};
 		};
 	};

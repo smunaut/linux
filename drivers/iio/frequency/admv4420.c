@@ -99,13 +99,6 @@ enum admv4420_ref_type {
 	ADMV4420_SINGLE_ENDED,
 };
 
-enum admv4420_charge_pump_st {
-	ADMV4420_CHARGE_PUMP_HIGHZ,
-	ADMV4420_CHARGE_PUMP_FORCE_UP,
-	ADMV4420_CHARGE_PUMP_FORCE_DOWN,
-	ADMV4420_CHARGE_PUMP_NORMAL_OP,
-};
-
 enum admv4420_n_counter_par {
 	ADMV4420_N_COUNTER_INT,
 	ADMV4420_N_COUNTER_FRAC,
@@ -127,13 +120,6 @@ struct admv4420_n_counter {
 	u32 n_counter;
 };
 
-struct admv4420_charge_pump {
-	bool bleed_en;
-	enum admv4420_charge_pump_st state;
-	u32 current_uA;
-	u32 bleed_current_uA;
-};
-
 struct admv4420_state {
 	struct spi_device		*spi;
 	struct regmap			*regmap;
@@ -142,7 +128,6 @@ struct admv4420_state {
 	u64 				lo_freq_hz;
 	struct admv4420_reference_block ref_block;
 	struct admv4420_n_counter	n_counter;
-	struct admv4420_charge_pump	pump;
 	enum admv4420_mux_sel		mux_sel;
 };
 
@@ -291,21 +276,6 @@ static ssize_t admv4420_mux_sel_store(struct device *dev,
 	return len;
 }
 
-static ssize_t admv4420_ref_type_show_available(struct device *dev,
-					   struct device_attribute *attr,
-					   char *buf)
-{
-	size_t len = 0;
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(admv4420_ref_type_str); ++i) {
-		if (admv4420_ref_type_str[i])
-			len += sprintf(buf + len, "%s ", admv4420_ref_type_str[i]);
-	}
-
-	return len;
-}
-
 static ssize_t admv4420_ref_type_show(struct device *dev,
 				 struct device_attribute *attr,
 				 char *buf)
@@ -314,44 +284,6 @@ static ssize_t admv4420_ref_type_show(struct device *dev,
 	struct admv4420_state *st = iio_priv(indio_dev);
 	
 	return sprintf(buf, "%s\n", admv4420_ref_type_str[st->ref_block.type]);
-}
-
-static ssize_t admv4420_ref_type_store(struct device *dev,
-			      struct device_attribute *attr,
-			      const char *buf, size_t len)
-{
-	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
-	struct admv4420_state *st = iio_priv(indio_dev);
-	int i, mode, ret;
-
-	for (i = 0; i < ARRAY_SIZE(admv4420_ref_type_str); ++i) {
-		if (admv4420_ref_type_str[i] && sysfs_streq(buf, admv4420_ref_type_str[i])) {
-			mode = i;
-			break;
-		}
-	}
-	ret = regmap_update_bits(st->regmap, ADMV4420_REFERENCE, ADMV4420_REFERENCE_MODE_MASK, mode);
-	if (ret)
-		return ret;
-
-	st->ref_block.type = mode;
-
-	return len;
-}
-
-static ssize_t admv4420_ref_doubler_show_available(struct device *dev,
-					   struct device_attribute *attr,
-					   char *buf)
-{
-	size_t len = 0;
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(admv4420_op_state); ++i) {
-		if (admv4420_op_state[i])
-			len += sprintf(buf + len, "%s ", admv4420_op_state[i]);
-	}
-
-	return len;
 }
 
 static ssize_t admv4420_ref_doubler_show(struct device *dev,
@@ -369,45 +301,6 @@ static ssize_t admv4420_ref_doubler_show(struct device *dev,
 	default:
 		return -EINVAL;
 	}
-}
-
-static ssize_t admv4420_ref_doubler_store(struct device *dev,
-			      struct device_attribute *attr,
-			      const char *buf, size_t len)
-{
-	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
-	struct iio_dev_attr *this_attr = to_iio_dev_attr(attr);
-	struct admv4420_state *st = iio_priv(indio_dev);
-	int i, mode, mask, ret;
-
-	for (i = 0; i < ARRAY_SIZE(admv4420_op_state); ++i) {
-		if (admv4420_op_state[i] && sysfs_streq(buf, admv4420_op_state[i])) {
-			mode = i;
-			break;
-		}
-	}
-	switch(this_attr->address) {
-	case ADMV4420_DOUBLER:
-		st->ref_block.doubler_en = mode;
-		mask = ADMV4420_REFERENCE_DOUBLER_MASK;
-		mode = FIELD_PREP(ADMV4420_REFERENCE_DOUBLER_MASK, mode);
-		break;
-	case ADMV4420_DIVIDE_BY_2:
-		st->ref_block.divide_by_2_en = mode;
-		mask = ADMV4420_REFERENCE_DIVIDE_BY_2_MASK;
-		mode = FIELD_PREP(ADMV4420_REFERENCE_DIVIDE_BY_2_MASK, mode);
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	ret = regmap_update_bits(st->regmap, ADMV4420_REFERENCE, mask, mode);
-	if (ret < 0)
-		return ret;
-
-	admv4420_calc_pfd_freq(st);
-
-	return len;
 }
 
 static ssize_t admv4420_n_counter_show(struct device *dev,
@@ -479,39 +372,6 @@ static ssize_t admv4420_ref_divider_show(struct device *dev,
 	return sprintf(buf, "%d\n", st->ref_block.divider);
 }
 
-static ssize_t admv4420_ref_divider_store(struct device *dev,
-			      struct device_attribute *attr,
-			      const char *buf, size_t len)
-{
-	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
-	struct admv4420_state *st = iio_priv(indio_dev);
-	u32 readval;
-	int ret = 0;
-
-	ret = kstrtou32(buf, 10, &readval);
-	if (ret)
-		return ret;
-
-	if (readval > ADMV4420_REF_DIVIDER_MAX_VAL)
-		return -EINVAL;
-
-	ret = regmap_write(st->regmap, ADMV4420_R_DIV_L,
-			   FIELD_GET(0xFF, readval));
-	if (ret < 0)
-		return ret;
-
-	ret = regmap_write(st->regmap, ADMV4420_R_DIV_H,
-			   FIELD_GET(0xFF00, readval));
-	if (ret < 0)
-		return ret;
-
-	st->ref_block.divider = readval;
-
-	admv4420_calc_pfd_freq(st);
-
-	return len;
-}
-
 static ssize_t admv4420_ref_freq_show(struct device *dev,
 				 struct device_attribute *attr,
 				 char *buf)
@@ -575,17 +435,14 @@ static IIO_DEVICE_ATTR(ref_freq_hz, 0644, admv4420_ref_freq_show, admv4420_ref_f
 static IIO_DEVICE_ATTR(vco_freq_hz, 0444, admv4420_vco_freq_show, NULL, 0);
 static IIO_DEVICE_ATTR(lo_freq_hz, 0444, admv4420_lo_freq_show, NULL, 0);
 static IIO_DEVICE_ATTR(pfd_freq_hz, 0444, admv4420_pfd_freq_show, NULL, 0);
-static IIO_DEVICE_ATTR(ref_doubler, 0644, admv4420_ref_doubler_show, admv4420_ref_doubler_store, ADMV4420_DOUBLER);
-static IIO_DEVICE_ATTR(ref_divide_by_2, 0644, admv4420_ref_doubler_show, admv4420_ref_doubler_store, ADMV4420_DIVIDE_BY_2);
-static IIO_DEVICE_ATTR(ref_type, 0644, admv4420_ref_type_show, admv4420_ref_type_store, ADMV4420_DIVIDE_BY_2);
-static IIO_DEVICE_ATTR(ref_divider, 0644, admv4420_ref_divider_show, admv4420_ref_divider_store, 0);
+static IIO_DEVICE_ATTR(ref_doubler, 0644, admv4420_ref_doubler_show, NULL, ADMV4420_DOUBLER);
+static IIO_DEVICE_ATTR(ref_divide_by_2, 0644, admv4420_ref_doubler_show, NULL, ADMV4420_DIVIDE_BY_2);
+static IIO_DEVICE_ATTR(ref_type, 0644, admv4420_ref_type_show, NULL, ADMV4420_DIVIDE_BY_2);
+static IIO_DEVICE_ATTR(ref_divider, 0644, admv4420_ref_divider_show, NULL, 0);
 static IIO_DEVICE_ATTR(mux_sel, 0644, admv4420_mux_sel_show, admv4420_mux_sel_store, 0);
 static IIO_DEVICE_ATTR(n_counter_int_val, 0644, admv4420_n_counter_show, admv4420_n_counter_store, ADMV4420_N_COUNTER_INT);
 static IIO_DEVICE_ATTR(n_counter_frac_val, 0644, admv4420_n_counter_show, admv4420_n_counter_store, ADMV4420_N_COUNTER_FRAC);
 static IIO_DEVICE_ATTR(n_counter_mod_val, 0644, admv4420_n_counter_show, admv4420_n_counter_store, ADMV4420_N_COUNTER_MOD);
-static IIO_DEVICE_ATTR(ref_doubler_available, 0444, admv4420_ref_doubler_show_available, NULL, 0);
-static IIO_DEVICE_ATTR(ref_divide_by_2_available, 0444, admv4420_ref_doubler_show_available, NULL, 0);
-static IIO_DEVICE_ATTR(ref_type_available, 0444, admv4420_ref_type_show_available, NULL, 0);
 static IIO_DEVICE_ATTR(mux_sel_available, 0444, admv4420_mux_sel_show_available, NULL, 0);
 
 static struct attribute *admv4420_attributes[] = {
@@ -601,9 +458,6 @@ static struct attribute *admv4420_attributes[] = {
 	&iio_dev_attr_n_counter_int_val.dev_attr.attr,
 	&iio_dev_attr_n_counter_frac_val.dev_attr.attr,
 	&iio_dev_attr_n_counter_mod_val.dev_attr.attr,
-	&iio_dev_attr_ref_doubler_available.dev_attr.attr,
-	&iio_dev_attr_ref_divide_by_2_available.dev_attr.attr,
-	&iio_dev_attr_ref_type_available.dev_attr.attr,
 	&iio_dev_attr_mux_sel_available.dev_attr.attr,
 	NULL,
 };
@@ -689,10 +543,6 @@ pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 	st->n_counter.frac_val = 0x02;
 	st->n_counter.mod_val = 0x04;
 
-	st->pump.state = ADMV4420_CHARGE_PUMP_NORMAL_OP;
-	st->pump.current_uA = 3;
-	st->pump.bleed_en = 1;
-	st->pump.bleed_current_uA = 0x0C;
 	st->mux_sel = ADMV4420_LOCK_DTCT;
 
 	admv4420_dt_parse(st);
@@ -724,22 +574,6 @@ pr_err("%s: %d: Enter ADMV4420 probe\n", __func__, __LINE__);
 		return ret;
 
 	ret = regmap_write(st->regmap, ADMV4420_PLL_MUX_SEL, st->mux_sel);
-	if (ret < 0)
-		return ret;
-
-	ret = regmap_update_bits(st->regmap, ADMV4420_CP_STATE, 0x03, st->pump.state);
-	if (ret < 0)
-		return ret;
-
-	ret = regmap_write(st->regmap, ADMV4420_CP_BLEED_EN, st->pump.bleed_en);
-	if (ret < 0)
-		return ret;
-
-	ret = regmap_write(st->regmap, ADMV4420_CP_CURRENT, st->pump.current_uA);
-	if (ret < 0)
-		return ret;
-
-	ret = regmap_write(st->regmap, ADMV4420_CP_BLEED, st->pump.bleed_current_uA);
 	if (ret < 0)
 		return ret;
 
