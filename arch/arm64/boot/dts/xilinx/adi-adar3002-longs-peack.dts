@@ -106,6 +106,44 @@
 		vss-supply = <&dac_vss>;
 		vdd-supply = <&dac_vdd>;
 	};
+	admv4420_CSB1@2 {
+		compatible = "adi,admv4420";
+		reg = <2>;
+		spi-max-frequency = <1000000>;
+
+		/* reference block config */
+		adi,ref_freq_hz = <50000000>;
+		adi,ref_type = <0>;
+		// adi,ref_doubler_en;
+		// adi,ref_divede_by_2_en;
+		adi,ref_diveder = <1>;
+
+		/* N counter config*/
+		adi,N_counter_int_val = <175>;
+		adi,N_counter_frac_val = <0>;
+		adi,N_counter_mod_val = <1>;
+
+		adi,mux_sel = <1>;
+	};
+	admv4420_CSB2@3 {
+		compatible = "adi,admv4420";
+		reg = <3>;
+		spi-max-frequency = <1000000>;
+
+		/* reference block config */
+		adi,ref_freq_hz = <50000000>;
+		adi,ref_type = <0>;
+		// adi,ref_doubler_en;
+		// adi,ref_divede_by_2_en;
+		adi,ref_diveder = <1>;
+
+		/* N counter config*/
+		adi,N_counter_int_val = <175>;
+		adi,N_counter_frac_val = <0>;
+		adi,N_counter_mod_val = <1>;
+
+		adi,mux_sel = <1>;
+	};
 };
 
 &i2c_to_spi_2 {
