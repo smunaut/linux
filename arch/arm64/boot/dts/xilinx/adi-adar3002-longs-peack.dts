@@ -90,18 +90,49 @@
 &i2c_to_spi_1 {
 	#address-cells = <1>;
 	#size-cells = <0>;
+	adrf5720@0 {
+		compatible = "adi,adrf5720";
+		label = "adrf5720_LE2";
+		reg = <0>;
+		spi-max-frequency = <100000>;
+	};
+	adrf5720@1 {
+		compatible = "adi,adrf5720";
+		label = "adrf5720_LE1";
+		reg = <1>;
+		spi-max-frequency = <100000>;
+	};
+	adl5240@2 {
+		compatible = "adi,adl5240";
+		label = "adl5240_LE1";
+		reg = <2>;
+		spi-max-frequency = <100000>;
+	};
+	adl5240@3 {
+		compatible = "adi,adl5240";
+		label = "adl5240_LE2";
+		reg = <3>;
+		spi-max-frequency = <100000>;
+	};
+};
+
+&i2c_to_spi_2 {
+	#address-cells = <1>;
+	#size-cells = <0>;
 	ad5760@0 {
 		compatible = "adi,ad5760";
+		label = "ad5760_SYNC1";
 		reg = <0>;
-		spi-max-frequency = <5000000>;
+		spi-max-frequency = <100000>;
 		spi-cpha;
 		vss-supply = <&dac_vss>;
 		vdd-supply = <&dac_vdd>;
 	};
 	ad5760@1 {
 		compatible = "adi,ad5760";
+		label = "ad5760_SYNC2";
 		reg = <1>;
-		spi-max-frequency = <5000000>;
+		spi-max-frequency = <100000>;
 		spi-cpha;
 		vss-supply = <&dac_vss>;
 		vdd-supply = <&dac_vdd>;
@@ -109,7 +140,9 @@
 	admv4420_CSB1@2 {
 		compatible = "adi,admv4420";
 		reg = <2>;
-		spi-max-frequency = <1000000>;
+		spi-max-frequency = <100000>;
+		spi-cpol;
+		label = "admv4420_CSB1";
 
 		/* reference block config */
 		adi,ref_freq_hz = <50000000>;
@@ -128,7 +161,9 @@
 	admv4420_CSB2@3 {
 		compatible = "adi,admv4420";
 		reg = <3>;
-		spi-max-frequency = <1000000>;
+		spi-max-frequency = <100000>;
+		spi-cpol;
+		label = "admv4420_CSB2";
 
 		/* reference block config */
 		adi,ref_freq_hz = <50000000>;
@@ -143,31 +178,6 @@
 		adi,N_counter_mod_val = <1>;
 
 		adi,mux_sel = <1>;
-	};
-};
-
-&i2c_to_spi_2 {
-	#address-cells = <1>;
-	#size-cells = <0>;
-	adrf5720@0 {
-		compatible = "adi,adrf5720";
-		reg = <0>;
-		spi-max-frequency = <10000000>;
-	};
-	adrf5720@1 {
-		compatible = "adi,adrf5720";
-		reg = <1>;
-		spi-max-frequency = <10000000>;
-	};
-	adl5240@2 {
-		compatible = "adi,adl5240";
-		reg = <2>;
-		spi-max-frequency = <100000>;
-	};
-	adl5240@3 {
-		compatible = "adi,adl5240";
-		reg = <3>;
-		spi-max-frequency = <100000>;
 	};
 };
 
