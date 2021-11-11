@@ -144,6 +144,25 @@ static int ad5791_spi_read(struct ad5791_state *st, u8 addr, u32 *val)
 	return ret;
 }
 
+static int ad5791_reg_access(struct iio_dev *indio_dev,
+			     u32 reg, u32 writeval,
+			     u32 *readval)
+{
+	int ret;
+	struct ad5791_state *st = iio_priv(indio_dev);
+
+	if (readval) {
+		ret = ad5791_spi_read(st, reg, readval);
+		pr_err("%s: %d: ad5791_reg_access_rd: %x %x %d\n", __func__, __LINE__, reg, *readval, ret);
+	}
+	else {
+
+		ret = ad5791_spi_write(st, reg, writeval);
+		pr_err("%s: %d: ad5791_reg_access_wr: %x %x %d\n", __func__, __LINE__, reg, writeval, ret);
+	}
+	return ret;
+}
+
 static const char * const ad5791_powerdown_modes[] = {
 	"6kohm_to_gnd",
 	"three_state",
@@ -339,6 +358,7 @@ static int ad5791_write_raw(struct iio_dev *indio_dev,
 static const struct iio_info ad5791_info = {
 	.read_raw = &ad5791_read_raw,
 	.write_raw = &ad5791_write_raw,
+	.debugfs_reg_access = &ad5791_reg_access,
 };
 
 static int ad5791_probe(struct spi_device *spi)

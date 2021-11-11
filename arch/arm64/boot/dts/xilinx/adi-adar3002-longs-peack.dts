@@ -76,10 +76,10 @@
 &axi_i2c_pmod {
 	#address-cells = <1>;
 	#size-cells = <0>;
-	i2c_to_spi_1: spi@28 {
-		compatible = "nxp,sc18is602b";
-		reg = <0x28>;
-	};
+	// i2c_to_spi_1: spi@28 {
+	// 	compatible = "nxp,sc18is602b";
+	// 	reg = <0x28>;
+	// };
 
 	i2c_to_spi_2: spi@29 {
 		compatible = "nxp,sc18is602b";
@@ -87,61 +87,60 @@
 	};
 };
 
-&i2c_to_spi_1 {
-	#address-cells = <1>;
-	#size-cells = <0>;
-	adrf5720@0 {
-		compatible = "adi,adrf5720";
-		label = "adrf5720_LE2";
-		reg = <0>;
-		spi-max-frequency = <100000>;
-	};
-	adrf5720@1 {
-		compatible = "adi,adrf5720";
-		label = "adrf5720_LE1";
-		reg = <1>;
-		spi-max-frequency = <100000>;
-	};
-	adl5240@2 {
-		compatible = "adi,adl5240";
-		label = "adl5240_LE1";
-		reg = <2>;
-		spi-max-frequency = <100000>;
-	};
-	adl5240@3 {
-		compatible = "adi,adl5240";
-		label = "adl5240_LE2";
-		reg = <3>;
-		spi-max-frequency = <100000>;
-	};
-};
+// &i2c_to_spi_1 {
+// 	#address-cells = <1>;
+// 	#size-cells = <0>;
+// 	adrf5720@0 {
+// 		compatible = "adi,adrf5720";
+// 		label = "adrf5720_LE2";
+// 		reg = <0>;
+// 		spi-max-frequency = <100000>;
+// 	};
+// 	adrf5720@1 {
+// 		compatible = "adi,adrf5720";
+// 		label = "adrf5720_LE1";
+// 		reg = <1>;
+// 		spi-max-frequency = <100000>;
+// 	};
+// 	adl5240@2 {
+// 		compatible = "adi,adl5240";
+// 		label = "adl5240_LE1";
+// 		reg = <2>;
+// 		spi-max-frequency = <100000>;
+// 	};
+// 	adl5240@3 {
+// 		compatible = "adi,adl5240";
+// 		label = "adl5240_LE2";
+// 		reg = <3>;
+// 		spi-max-frequency = <100000>;
+// 	};
+// };
 
 &i2c_to_spi_2 {
 	#address-cells = <1>;
 	#size-cells = <0>;
-	ad5760@0 {
-		compatible = "adi,ad5760";
-		label = "ad5760_SYNC1";
-		reg = <0>;
-		spi-max-frequency = <100000>;
-		spi-cpha;
-		vss-supply = <&dac_vss>;
-		vdd-supply = <&dac_vdd>;
-	};
-	ad5760@1 {
-		compatible = "adi,ad5760";
-		label = "ad5760_SYNC2";
-		reg = <1>;
-		spi-max-frequency = <100000>;
-		spi-cpha;
-		vss-supply = <&dac_vss>;
-		vdd-supply = <&dac_vdd>;
-	};
+	// ad5760@0 {
+	// 	compatible = "adi,ad5760";
+	// 	label = "ad5760_SYNC1";
+	// 	reg = <0>;
+	// 	spi-max-frequency = <100000>;
+	// 	spi-cpha;
+	// 	vss-supply = <&dac_vss>;
+	// 	vdd-supply = <&dac_vdd>;
+	// };
+	// ad5760@1 {
+	// 	compatible = "adi,ad5760";
+	// 	label = "ad5760_SYNC2";
+	// 	reg = <1>;
+	// 	spi-max-frequency = <100000>;
+	// 	spi-cpha;
+	// 	vss-supply = <&dac_vss>;
+	// 	vdd-supply = <&dac_vdd>;
+	// };
 	admv4420_CSB1@2 {
 		compatible = "adi,admv4420";
 		reg = <2>;
-		spi-max-frequency = <100000>;
-		spi-cpol;
+		spi-max-frequency = <500000>;
 		label = "admv4420_CSB1";
 
 		/* reference block config */
@@ -158,27 +157,27 @@
 
 		adi,mux_sel = <1>;
 	};
-	admv4420_CSB2@3 {
-		compatible = "adi,admv4420";
-		reg = <3>;
-		spi-max-frequency = <100000>;
-		spi-cpol;
-		label = "admv4420_CSB2";
+	// admv4420_CSB2@3 {
+	// 	compatible = "adi,admv4420";
+	// 	reg = <3>;
+	// 	spi-max-frequency = <1000000>;
+	// 	spi-cpol;
+	// 	label = "admv4420_CSB2";
 
-		/* reference block config */
-		adi,ref_freq_hz = <50000000>;
-		adi,ref_type = <0>;
-		// adi,ref_doubler_en;
-		// adi,ref_divede_by_2_en;
-		adi,ref_diveder = <1>;
+	// 	/* reference block config */
+	// 	adi,ref_freq_hz = <50000000>;
+	// 	adi,ref_type = <0>;
+	// 	// adi,ref_doubler_en;
+	// 	// adi,ref_divede_by_2_en;
+	// 	adi,ref_diveder = <1>;
 
-		/* N counter config*/
-		adi,N_counter_int_val = <175>;
-		adi,N_counter_frac_val = <0>;
-		adi,N_counter_mod_val = <1>;
+	// 	/* N counter config*/
+	// 	adi,N_counter_int_val = <175>;
+	// 	adi,N_counter_frac_val = <0>;
+	// 	adi,N_counter_mod_val = <1>;
 
-		adi,mux_sel = <1>;
-	};
+	// 	adi,mux_sel = <1>;
+	// };
 };
 
 &axi_spi_pmod {

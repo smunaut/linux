@@ -66,7 +66,7 @@ static int sc18is602_txrx(struct sc18is602 *hw, struct spi_message *msg,
 			  struct spi_transfer *t, bool do_transfer)
 {
 	unsigned int len = t->len;
-	int ret;
+	int ret, i;
 
 	if (hw->tlen == 0) {
 		/* First byte (I2C command) is chip select */
@@ -104,10 +104,14 @@ static int sc18is602_txrx(struct sc18is602 *hw, struct spi_message *msg,
 		if (ret < 0)
 			return ret;
 		ret = i2c_master_send(hw->client, hw->buffer, hw->tlen);
+		for (i = 0; i < hw->tlen; i++)
+				pr_err("sc18is602_send %d: %x\n", i, hw->buffer[i]);
 		if (ret < 0)
 			return ret;
+		pr_err("%s: %d: sc18is602_send\n", __func__, __LINE__);				
 		if (ret != hw->tlen)
 			return -EIO;
+		pr_err("%s: %d: sc18is602_send\n", __func__, __LINE__);	
 
 		if (t->rx_buf) {
 			int rlen = hw->rindex + len;
@@ -116,10 +120,14 @@ static int sc18is602_txrx(struct sc18is602 *hw, struct spi_message *msg,
 			if (ret < 0)
 				return ret;
 			ret = i2c_master_recv(hw->client, hw->buffer, rlen);
+			for (i = 0; i < rlen; i++)
+				pr_err("sc18is602_recv %d: %x\n", i, hw->buffer[i]);
 			if (ret < 0)
 				return ret;
+			pr_err("%s: %d: sc18is602_recv\n", __func__, __LINE__);	
 			if (ret != rlen)
 				return -EIO;
+			pr_err("%s: %d: sc18is602_recv\n", __func__, __LINE__);
 			memcpy(t->rx_buf, &hw->buffer[hw->rindex], len);
 		}
 		hw->tlen = 0;
