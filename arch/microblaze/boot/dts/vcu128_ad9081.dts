@@ -7,7 +7,7 @@
  * hdl_project: <ad9081_fmca_ebz/vcu128>
  * board_revision: <>
  *
- * Copyright (C) 2019-2020 Analog Devices Inc.
+ * Copyright (C) 2021 Analog Devices Inc.
  */
 /dts-v1/;
 
@@ -27,7 +27,7 @@
 	xlnx,kind-of-intr = <0xffff05f0>;
 };
 
-&axi_ethernet {
+&axi_ethernet_0 {
 	local-mac-address = [00 0a 35 01 90 81];
 };
 
@@ -100,6 +100,7 @@
 		clock-names = "sampl_clk";
 		spibus-connected = <&trx0_ad9081>;
 		adi,axi-pl-fifo-enable;
+		adi,axi-data-offload-connected = <&axi_data_offload_tx>;
 
 		jesd204-device;
 		#jesd204-cells = <2>;
@@ -185,6 +186,16 @@
 	axi_sysid_0: axi-sysid-0@45000000 {
 		compatible = "adi,axi-sysid-1.00.a";
 		reg = <0x45000000 0x10000>;
+	};
+
+	axi_data_offload_rx: data_offload@7c450000 {
+		compatible = "adi,axi-data-offload-1.0.a";
+		reg = <0x7c450000 0x10000>;
+	};
+
+	axi_data_offload_tx: data_offload@7c440000 {
+		compatible = "adi,axi-data-offload-1.0.a";
+		reg = <0x7c440000 0x10000>;
 	};
 };
 

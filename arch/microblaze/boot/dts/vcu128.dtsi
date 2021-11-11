@@ -10,7 +10,7 @@
 		stdout-path = "serial0:115200n8";
 	};
 	aliases {
-		ethernet0 = &axi_ethernet;
+		ethernet0 = &axi_ethernet_0;
 		i2c0 = &axi_iic_main;
 		serial0 = &axi_uart;
 		serial1 = &sys_mb_debug;
@@ -29,13 +29,13 @@
 			clock-frequency = <100000000>;
 			clocks = <&clk_cpu>;
 			compatible = "xlnx,microblaze-11.0";
-			d-cache-baseaddr = <0x0000000080000000>;
-			d-cache-highaddr = <0x00000000ffffffff>;
+			d-cache-baseaddr = <0x80000000>;
+			d-cache-highaddr = <0xffffffff>;
 			d-cache-line-size = <0x10>;
 			d-cache-size = <0x4000>;
 			device_type = "cpu";
-			i-cache-baseaddr = <0x0000000080000000>;
-			i-cache-highaddr = <0x00000000ffffffff>;
+			i-cache-baseaddr = <0x80000000>;
+			i-cache-highaddr = <0xffffffff>;
 			i-cache-line-size = <0x20>;
 			i-cache-size = <0x4000>;
 			interrupt-handle = <&axi_intc>;
@@ -185,14 +185,15 @@
 		#size-cells = <1>;
 		compatible = "simple-bus";
 		ranges ;
-		axi_ddr_cntrl: ddr4@80000000 {
+		axi_ddr_cntrl: ddr4@45100000 {
 			compatible = "xlnx,ddr4-2.2";
-			reg = <0x80000000 0x80000000>;
+			reg = <0x45100000 0x1000>;
 		};
-		axi_ethernet: ethernet@40c00000 {
+		axi_ethernet_0: ethernet@40c00000 {
 			axistream-connected = <&axi_ethernet_dma>;
 			axistream-control-connected = <&axi_ethernet_dma>;
 			clock-frequency = <100000000>;
+			clocks = <&clk_bus_0>;
 			compatible = "xlnx,axi-ethernet-7.2", "xlnx,axi-ethernet-1.00.a";
 			device_type = "network";
 			interrupt-names = "interrupt";
@@ -205,6 +206,7 @@
 			xlnx = <0x0>;
 			xlnx,axiliteclkrate = <0x0>;
 			xlnx,axisclkrate = <0x0>;
+			xlnx,channel-ids = <0x1>;
 			xlnx,clockselection = <0x0>;
 			xlnx,enableasyncsgmii = <0x0>;
 			xlnx,gt-type = <0x0>;
@@ -212,8 +214,8 @@
 			xlnx,gtlocation = <0x0>;
 			xlnx,gtrefclksrc = <0x0>;
 			xlnx,include-dre ;
-			xlnx,instantiatebitslice0 = <0x0>;
-			xlnx,phy-type = <0x4>;
+			xlnx,instantiatebitslice0 = <0x1>;
+			xlnx,num-queues = /bits/ 16 <0x1>;
 			xlnx,phyaddr = <0x1>;
 			xlnx,phyrst-board-interface-dummy-port = <0x0>;
 			xlnx,rable = <0x0>;
@@ -222,11 +224,12 @@
 			xlnx,rxlane1-placement = <0x0>;
 			xlnx,rxmem = <0x2000>;
 			xlnx,rxnibblebitslice0used = <0x0>;
-			xlnx,tx-in-upper-nibble = <0x0>;
+			xlnx,tx-in-upper-nibble = <0x1>;
 			xlnx,txcsum = <0x2>;
 			xlnx,txlane0-placement = <0x0>;
 			xlnx,txlane1-placement = <0x0>;
-			axi_ethernet_mdio: mdio {
+			xlnx,versal-gt-board-flow = <0x0>;
+			axi_ethernet_0_mdio: mdio {
 				#address-cells = <1>;
 				#size-cells = <0>;
 				phy1: phy@3 {
@@ -242,8 +245,8 @@
 		};
 		axi_ethernet_dma: dma@41e10000 {
 			#dma-cells = <1>;
-			axistream-connected = <&axi_ethernet>;
-			axistream-control-connected = <&axi_ethernet>;
+			axistream-connected = <&axi_ethernet_0>;
+			axistream-control-connected = <&axi_ethernet_0>;
 			clock-frequency = <100000000>;
 			clock-names = "s_axi_lite_aclk";
 			clocks = <&clk_bus_0>;
@@ -287,15 +290,16 @@
 			#size-cells = <0>;
 			clock-frequency = <100000000>;
 			clocks = <&clk_bus_0>;
-			compatible = "xlnx,axi-iic-2.0", "xlnx,xps-iic-2.00.a";
+			compatible = "xlnx,axi-iic-2.1", "xlnx,xps-iic-2.00.a";
 			interrupt-names = "iic2intc_irpt";
 			interrupt-parent = <&axi_intc>;
 			interrupts = <9 2>;
 			reg = <0x41600000 0x1000>;
+
 			tca6416_u65:gpio@20 {
 				compatible = "ti,tca6416";
 				reg = <0x20>;
-				gpio-controller; /* IRQ not connected */
+				//gpio-controller; /* IRQ not connected */
 				#gpio-cells = <2>;
 				gpio-line-names = "MAX6643_OT_B", "MAX6643_FANFAIL_B",
 				"VCCINT_VCCBRAM_HOT_N", "PMIC_INTR",
@@ -303,47 +307,19 @@
 				"GEM3_EXP_RESET_B", "MAX6643_FULL_SPEED",
 				"", "", "", "", "", "", "", "";
 			};
-			i2c-mux@75 {
+			i2c-mux@76 {
 				compatible = "nxp,pca9548";
 				#address-cells = <1>;
 				#size-cells = <0>;
-				reg = <0x75>;
-				fmcp_hspc_iic: i2c@1 {
-					#address-cells = <1>;
-					#size-cells = <0>;
-					reg = <1>;
-				};
-				fmc_hpc1_iic: i2c@2 {
-					#address-cells = <1>;
-					#size-cells = <0>;
-					reg = <2>;
-				};
-				i2c@3 {
-					#address-cells = <1>;
-					#size-cells = <0>;
-					reg = <3>;
-					eeprom@54 {
-						compatible = "atmel,24c08";
-						reg = <0x54>;
-					};
-				};
-			};
-			i2c-mux@74 {
-				compatible = "nxp,pca9548";
-				#address-cells = <1>;
-				#size-cells = <0>;
-				reg = <0x74>;
-				i2c@0 {
+				reg = <0x76>;
+				fmcp_hspc_iic: i2c@0 {
 					#address-cells = <1>;
 					#size-cells = <0>;
 					reg = <0>;
-					si570: clock-generator@5d {
-						#clock-cells = <0>;
-						compatible = "silabs,si570";
-						temperature-stability = <50>;
-						reg = <0x5d>;
-						factory-fout = <156250000>;
-						clock-frequency = <148500000>;
+
+					eeprom@50 {
+						compatible = "at24,24c02";
+						reg = <0x50>;
 					};
 				};
 			};
@@ -353,10 +329,10 @@
 			compatible = "xlnx,axi-intc-4.1", "xlnx,xps-intc-1.00.a";
 			interrupt-controller ;
 			reg = <0x41200000 0x1000>;
-			xlnx,kind-of-intr = <0x35f8>;
+			xlnx,kind-of-intr = <0x5f0>;
 			xlnx,num-intr-inputs = <0x10>;
 		};
-		axi_spi: axi_quad_spi@44a70000 {
+		axi_spi: spi@44a70000 {
 			#address-cells = <1>;
 			#size-cells = <0>;
 			bits-per-word = <8>;
