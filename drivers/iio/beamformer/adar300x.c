@@ -1563,12 +1563,19 @@ static int adar300x_probe(struct spi_device *spi, const struct attribute_group *
 		return PTR_ERR(regmap);
 	}
 
-	gpio_reset = devm_gpiod_get(&spi->dev, "reset", GPIOD_OUT_LOW);
-	if (PTR_ERR(gpio_reset) == -EPROBE_DEFER)
-		return -EPROBE_DEFER;
+	gpio_reset = devm_gpiod_get_optional(&spi->dev, "reset", GPIOD_OUT_LOW);
+	/* If EBUSY, another ADAR300x device is defined on the same reset line,
+	 * this is a valid case
+	 */
+	if (IS_ERR(gpio_reset) && PTR_ERR(gpio_reset) != -EBUSY) {
+		pr_err("%s: %d: Enter adar300x_probe\n", __func__, __LINE__);
+		return PTR_ERR(gpio_reset);
+	}
 
-	if (!IS_ERR(gpio_reset))
+	if (gpio_reset && PTR_ERR(gpio_reset) != -EBUSY) {
+		pr_err("%s: %d: Enter adar300x_probe\n", __func__, __LINE__);
 		ad300x_reset(gpio_reset);
+	}
 
 	for_each_available_child_of_node(np, child) {
 		indio_dev = devm_iio_device_alloc(&spi->dev, sizeof(*st));
