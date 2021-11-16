@@ -83,6 +83,7 @@ enum admv4420_option_st {
 enum admv4420_ref_op {
 	ADMV4420_DOUBLER,
 	ADMV4420_DIVIDE_BY_2,
+	ADMV4420_REF_SINGLE_ENDED,
 };
 
 enum admv4420_mux_sel {
@@ -91,11 +92,6 @@ enum admv4420_mux_sel {
 	ADMV4420_R_COUNTER_PER_2 = 4,
 	ADMV4420_N_CONUTER_PER_2 = 5,
 	ADMV4420_HIGH = 8,
-};
-
-enum admv4420_ref_type {
-	ADMV4420_XTAL,
-	ADMV4420_SINGLE_ENDED,
 };
 
 enum admv4420_n_counter_par {
@@ -107,7 +103,7 @@ enum admv4420_n_counter_par {
 struct admv4420_reference_block {
 	bool doubler_en;
 	bool divide_by_2_en;
-	enum admv4420_ref_type type;
+	bool admv4420_ref_single_ended;
 	u32 freq_hz;
 	u32 divider;
 };
@@ -134,11 +130,6 @@ struct admv4420_state {
 static const char *const admv4420_op_state[] = {
 	[ADMV4420_DISABLED] = "disabled",
 	[ADMV4420_ENABLED] = "enabled",
-};
-
-static const char *const admv4420_ref_type_str[] = {
-	[ADMV4420_XTAL] = "XTAL",
-	[ADMV4420_SINGLE_ENDED] = "single_ended",
 };
 
 static const char *const admv4420_mux_sel_str[] = {
@@ -272,16 +263,6 @@ static ssize_t admv4420_mux_sel_store(struct device *dev,
 	return len;
 }
 
-static ssize_t admv4420_ref_type_show(struct device *dev,
-				 struct device_attribute *attr,
-				 char *buf)
-{
-	struct iio_dev *indio_dev = dev_to_iio_dev(dev);
-	struct admv4420_state *st = iio_priv(indio_dev);
-
-	return sprintf(buf, "%s\n", admv4420_ref_type_str[st->ref_block.type]);
-}
-
 static ssize_t admv4420_ref_doubler_show(struct device *dev,
 				 struct device_attribute *attr,
 				 char *buf)
@@ -295,6 +276,9 @@ static ssize_t admv4420_ref_doubler_show(struct device *dev,
 		return sprintf(buf, "%s\n", admv4420_op_state[st->ref_block.doubler_en]);
 	case ADMV4420_DIVIDE_BY_2:
 		return sprintf(buf, "%s\n", admv4420_op_state[st->ref_block.divide_by_2_en]);
+	case ADMV4420_REF_SINGLE_ENDED:
+		return sprintf(buf, "%s\n",
+			       admv4420_op_state[st->ref_block.admv4420_ref_single_ended]);
 	default:
 		return -EINVAL;
 	}
@@ -438,7 +422,7 @@ static IIO_DEVICE_ATTR(lo_freq_hz, 0444, admv4420_lo_freq_show, NULL, 0);
 static IIO_DEVICE_ATTR(pfd_freq_hz, 0444, admv4420_pfd_freq_show, NULL, 0);
 static IIO_DEVICE_ATTR(ref_doubler, 0644, admv4420_ref_doubler_show, NULL, ADMV4420_DOUBLER);
 static IIO_DEVICE_ATTR(ref_divide_by_2, 0644, admv4420_ref_doubler_show, NULL, ADMV4420_DIVIDE_BY_2);
-static IIO_DEVICE_ATTR(ref_type, 0644, admv4420_ref_type_show, NULL, ADMV4420_DIVIDE_BY_2);
+static IIO_DEVICE_ATTR(ref_type, 0644, admv4420_ref_doubler_show, NULL, ADMV4420_REF_SINGLE_ENDED);
 static IIO_DEVICE_ATTR(ref_divider, 0644, admv4420_ref_divider_show, NULL, 0);
 static IIO_DEVICE_ATTR(mux_sel, 0644, admv4420_mux_sel_show, admv4420_mux_sel_store, 0);
 static IIO_DEVICE_ATTR(n_counter_int_val, 0644, admv4420_n_counter_show, admv4420_n_counter_store, ADMV4420_N_COUNTER_INT);
@@ -467,20 +451,56 @@ static const struct attribute_group admv4420_attribute_group = {
 	.attrs = admv4420_attributes,
 };
 
+static int admv4420_read_raw(struct iio_dev *indio_dev,
+			     struct iio_chan_spec const *chan,
+			     int *val, int *val2, long info)
+{
+	struct adrf6780_state *dev = iio_priv(indio_dev);
+	unsigned int data;
+	int ret;
+
+	switch (info) {
+	case IIO_CHAN_INFO_FREQUENCY:
+		// ret = adrf6780_read_adc_raw(dev, &data);
+		// if (ret)
+		// 	return ret;
+
+		*val = 0x66;
+
+		return IIO_VAL_INT;
+	default:
+		return -EINVAL;
+	}
+}		
+
 static const struct iio_info admv4420_info = {
+	.read_raw = admv4420_read_raw,
 	.debugfs_reg_access = &admv4420_reg_access,
 	.attrs = &admv4420_attribute_group,
+};
+
+#define ADMV4420_CHAN_LO(_channel) {				\
+	.type = IIO_ALTVOLTAGE,					\
+	.output = 0,						\
+	.indexed = 1,						\
+	.channel = _channel,					\
+	.info_mask_separate = BIT(IIO_CHAN_INFO_FREQUENCY)	\
+}
+
+static const struct iio_chan_spec admv4420_channels[] = {
+	ADMV4420_CHAN_LO(0),
 };
 
 static int admv4420_dt_parse(struct admv4420_state *st)
 {
 	struct spi_device *spi = st->spi;
 
-	of_property_read_u32(spi->dev.of_node, "adi,ref_freq_hz", &st->ref_block.freq_hz);
-	of_property_read_u32(spi->dev.of_node, "adi,ref_type", &st->ref_block.type);
+	st->ref_block.admv4420_ref_single_ended = of_property_read_bool(spi->dev.of_node,
+									"adi,ref_single_ended");
 	st->ref_block.doubler_en = of_property_read_bool(spi->dev.of_node, "adi,ref_doubler_en");
 	st->ref_block.divide_by_2_en = of_property_read_bool(spi->dev.of_node,
 							     "adi,ref_divide_by_2_en");
+	of_property_read_u32(spi->dev.of_node, "adi,ref_freq_hz", &st->ref_block.freq_hz);
 	of_property_read_u32(spi->dev.of_node, "adi,ref_divider", &st->ref_block.divider);
 	of_property_read_u32(spi->dev.of_node, "adi,N_counter_int_val", &st->n_counter.int_val);
 	of_property_read_u32(spi->dev.of_node, "adi,N_counter_frac_val", &st->n_counter.frac_val);
@@ -529,7 +549,7 @@ static int admv4420_setup(struct iio_dev *indio_dev)
 	}
 
 	st->ref_block.freq_hz = 50000000;
-	st->ref_block.type = ADMV4420_XTAL;
+	st->ref_block.admv4420_ref_single_ended = false;
 	st->ref_block.doubler_en = false;
 	st->ref_block.divide_by_2_en = false;
 	st->ref_block.divider = 1;
@@ -554,7 +574,7 @@ static int admv4420_setup(struct iio_dev *indio_dev)
 
 	ret = regmap_write(st->regmap, ADMV4420_REFERENCE,
 			   st->ref_block.divide_by_2_en |
-			   ADMV4420_REFERENCE_IN_MODE(st->ref_block.type) |
+			   ADMV4420_REFERENCE_IN_MODE(st->ref_block.admv4420_ref_single_ended) |
 			   ADMV4420_REFERENCE_DOUBLER(st->ref_block.doubler_en));
 	if (ret < 0)
 		return ret;
@@ -603,6 +623,8 @@ static int admv4420_probe(struct spi_device *spi)
 	indio_dev->dev.parent = &spi->dev;
 	indio_dev->name = "admv4420";
 	indio_dev->info = &admv4420_info;
+	indio_dev->channels = admv4420_channels;
+	indio_dev->num_channels = ARRAY_SIZE(admv4420_channels);
 
 	ret = admv4420_setup(indio_dev);
 	if (ret < 0) {

@@ -17,7 +17,7 @@
 
 				/* reference block config */
 				adi,ref_freq_hz = <50000000>;
-				adi,ref_type = <0>;
+				// adi,ref_single_ended;
 				// adi,ref_doubler_en;
 				// adi,ref_divede_by_2_en;
 				adi,ref_diveder = <1>;
