@@ -17,10 +17,10 @@
 
 				/* reference block config */
 				adi,ref_freq_hz = <50000000>;
-				// adi,ref_single_ended;
+				// adi,ref_single_ended_en;
 				// adi,ref_doubler_en;
-				// adi,ref_divede_by_2_en;
-				adi,ref_diveder = <1>;
+				// adi,ref_divide_by_2_en;
+				adi,ref_divider = <1>;
 
 				/* N counter config*/
 				adi,N_counter_int_val = <0xA7>;

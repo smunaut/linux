@@ -60,10 +60,18 @@
 #define ADMV4420_REFERENCE_MODE_MASK		BIT(1)
 #define ADMV4420_REFERENCE_DOUBLER_MASK		BIT(2)
 #define ADMV4420_REF_DIVIDER_MAX_VAL		GENMASK(9, 0)
-
 #define ADMV4420_N_COUNTER_INT_MAX		GENMASK(15, 0)
 #define ADMV4420_N_COUNTER_FRAC_MAX		GENMASK(23, 0)
 #define ADMV4420_N_COUNTER_MOD_MAX		GENMASK(23, 0)
+
+#define ADMV4420_INT_L_MASK			GENMASK(7, 0)
+#define ADMV4420_INT_H_MASK			GENMASK(15, 8)
+#define ADMV4420_FRAC_L_MASK			GENMASK(7, 0)
+#define ADMV4420_FRAC_M_MASK			GENMASK(15, 8)
+#define ADMV4420_FRAC_H_MASK			GENMASK(23, 16)
+#define ADMV4420_MOD_L_MASK			GENMASK(7, 0)
+#define ADMV4420_MOD_M_MASK			GENMASK(15, 8)
+#define ADMV4420_MOD_H_MASK			GENMASK(23, 16)
 
 #define ENABLE_PLL				BIT(6)
 #define ENABLE_LO				BIT(5)
@@ -103,7 +111,7 @@ enum admv4420_n_counter_par {
 struct admv4420_reference_block {
 	bool doubler_en;
 	bool divide_by_2_en;
-	bool admv4420_ref_single_ended;
+	bool ref_single_ended;
 	u32 freq_hz;
 	u32 divider;
 };
@@ -184,35 +192,35 @@ static int admv4420_set_n_counter(struct admv4420_state *st, u32 int_val, u32 fr
 {
 	int ret;
 
-	ret = regmap_write(st->regmap, ADMV4420_FRAC_H, FIELD_GET(0xFF0000, frac_val));
-	if (ret < 0)
+	ret = regmap_write(st->regmap, ADMV4420_FRAC_H, FIELD_GET(ADMV4420_FRAC_H_MASK, frac_val));
+	if (ret)
 		return ret;
 
-	ret = regmap_write(st->regmap, ADMV4420_FRAC_M, FIELD_GET(0xFF00, frac_val));
-	if (ret < 0)
+	ret = regmap_write(st->regmap, ADMV4420_FRAC_M, FIELD_GET(ADMV4420_FRAC_M_MASK, frac_val));
+	if (ret)
 		return ret;
 
-	ret = regmap_write(st->regmap, ADMV4420_FRAC_L, FIELD_GET(0xFF, frac_val));
-	if (ret < 0)
+	ret = regmap_write(st->regmap, ADMV4420_FRAC_L, FIELD_GET(ADMV4420_FRAC_L_MASK, frac_val));
+	if (ret)
 		return ret;
 
-	ret = regmap_write(st->regmap, ADMV4420_MOD_H, FIELD_GET(0xFF0000, mod_val));
-	if (ret < 0)
+	ret = regmap_write(st->regmap, ADMV4420_MOD_H, FIELD_GET(ADMV4420_MOD_H_MASK, mod_val));
+	if (ret)
 		return ret;
 
-	ret = regmap_write(st->regmap, ADMV4420_MOD_M, FIELD_GET(0xFF00, mod_val));
-	if (ret < 0)
+	ret = regmap_write(st->regmap, ADMV4420_MOD_M, FIELD_GET(ADMV4420_MOD_M_MASK, mod_val));
+	if (ret)
 		return ret;
 
-	ret = regmap_write(st->regmap, ADMV4420_MOD_L, FIELD_GET(0xFF, mod_val));
-	if (ret < 0)
+	ret = regmap_write(st->regmap, ADMV4420_MOD_L, FIELD_GET(ADMV4420_MOD_L_MASK, mod_val));
+	if (ret)
 		return ret;
 
-	ret = regmap_write(st->regmap, ADMV4420_INT_H, FIELD_GET(0xFF00, int_val));
-	if (ret < 0)
+	ret = regmap_write(st->regmap, ADMV4420_INT_H, FIELD_GET(ADMV4420_INT_H_MASK, int_val));
+	if (ret)
 		return ret;
 
-	return regmap_write(st->regmap, ADMV4420_INT_L, FIELD_GET(0xFF, int_val));
+	return regmap_write(st->regmap, ADMV4420_INT_L, FIELD_GET(ADMV4420_INT_L_MASK, int_val));
 }
 
 static ssize_t admv4420_mux_sel_show_available(struct device *dev,
@@ -255,7 +263,7 @@ static ssize_t admv4420_mux_sel_store(struct device *dev,
 		}
 	}
 	ret = regmap_write(st->regmap, ADMV4420_PLL_MUX_SEL, mode);
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	st->mux_sel = mode;
@@ -278,7 +286,7 @@ static ssize_t admv4420_ref_doubler_show(struct device *dev,
 		return sprintf(buf, "%s\n", admv4420_op_state[st->ref_block.divide_by_2_en]);
 	case ADMV4420_REF_SINGLE_ENDED:
 		return sprintf(buf, "%s\n",
-			       admv4420_op_state[st->ref_block.admv4420_ref_single_ended]);
+			       admv4420_op_state[st->ref_block.ref_single_ended]);
 	default:
 		return -EINVAL;
 	}
@@ -335,7 +343,7 @@ static ssize_t admv4420_n_counter_store(struct device *dev,
 
 	ret = admv4420_set_n_counter(st, st->n_counter.int_val, st->n_counter.frac_val,
 				     st->n_counter.mod_val);
-	if (ret < 0)
+	if (ret)
 		goto err_unlock;
 
 	admv4420_calc_vco_freq(st);
@@ -455,19 +463,14 @@ static int admv4420_read_raw(struct iio_dev *indio_dev,
 			     struct iio_chan_spec const *chan,
 			     int *val, int *val2, long info)
 {
-	struct adrf6780_state *dev = iio_priv(indio_dev);
-	unsigned int data;
-	int ret;
+	struct admv4420_state *st = iio_priv(indio_dev);
 
 	switch (info) {
 	case IIO_CHAN_INFO_FREQUENCY:
-		// ret = adrf6780_read_adc_raw(dev, &data);
-		// if (ret)
-		// 	return ret;
+		*val = div_u64(st->lo_freq_hz, 1000000);
+		div_u64_rem(st->lo_freq_hz, 1000000, val2);
 
-		*val = 0x66;
-
-		return IIO_VAL_INT;
+		return IIO_VAL_INT_PLUS_MICRO;
 	default:
 		return -EINVAL;
 	}
@@ -491,23 +494,21 @@ static const struct iio_chan_spec admv4420_channels[] = {
 	ADMV4420_CHAN_LO(0),
 };
 
-static int admv4420_dt_parse(struct admv4420_state *st)
+static void admv4420_dt_parse(struct admv4420_state *st)
 {
 	struct spi_device *spi = st->spi;
 
-	st->ref_block.admv4420_ref_single_ended = of_property_read_bool(spi->dev.of_node,
-									"adi,ref_single_ended");
+	st->ref_block.ref_single_ended = of_property_read_bool(spi->dev.of_node,
+							       "adi,ref_single_ended");
 	st->ref_block.doubler_en = of_property_read_bool(spi->dev.of_node, "adi,ref_doubler_en");
 	st->ref_block.divide_by_2_en = of_property_read_bool(spi->dev.of_node,
 							     "adi,ref_divide_by_2_en");
-	of_property_read_u32(spi->dev.of_node, "adi,ref_freq_hz", &st->ref_block.freq_hz);
-	of_property_read_u32(spi->dev.of_node, "adi,ref_divider", &st->ref_block.divider);
-	of_property_read_u32(spi->dev.of_node, "adi,N_counter_int_val", &st->n_counter.int_val);
-	of_property_read_u32(spi->dev.of_node, "adi,N_counter_frac_val", &st->n_counter.frac_val);
-	of_property_read_u32(spi->dev.of_node, "adi,N_counter_mod_val", &st->n_counter.mod_val);
-	of_property_read_u32(spi->dev.of_node, "adi,mux_sel", &st->mux_sel);
-
-	return 0;
+	device_property_read_u32(&spi->dev, "adi,ref_freq_hz", &st->ref_block.freq_hz);
+	device_property_read_u32(&spi->dev, "adi,ref_divider", &st->ref_block.divider);
+	device_property_read_u32(&spi->dev, "adi,N_counter_int_val", &st->n_counter.int_val);
+	device_property_read_u32(&spi->dev, "adi,N_counter_frac_val", &st->n_counter.frac_val);
+	device_property_read_u32(&spi->dev, "adi,N_counter_mod_val", &st->n_counter.mod_val);
+	device_property_read_u32(&spi->dev, "adi,mux_sel", &st->mux_sel);
 }
 
 static int admv4420_setup(struct iio_dev *indio_dev)
@@ -519,15 +520,15 @@ static int admv4420_setup(struct iio_dev *indio_dev)
 	/* Software reset and activate SDO */
 	ret = regmap_write(st->regmap, ADMV4420_SPI_CONFIG_1,
 			   ADMV4420_SPI_CONFIG_1_SOFTRESET_ | ADMV4420_SPI_CONFIG_1_SOFTRESET);
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	ret = regmap_write(st->regmap, ADMV4420_SCRATCHPAD, ADAR1000_SCRATCH_PAD_VAL_1);
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	ret = regmap_read(st->regmap, ADMV4420_SCRATCHPAD, &val);
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	if (val != ADAR1000_SCRATCH_PAD_VAL_1) {
@@ -536,11 +537,11 @@ static int admv4420_setup(struct iio_dev *indio_dev)
 	}
 
 	ret = regmap_write(st->regmap, ADMV4420_SCRATCHPAD, ADAR1000_SCRATCH_PAD_VAL_2);
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	ret = regmap_read(st->regmap, ADMV4420_SCRATCHPAD, &val);
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	if (val != ADAR1000_SCRATCH_PAD_VAL_2) {
@@ -549,7 +550,7 @@ static int admv4420_setup(struct iio_dev *indio_dev)
 	}
 
 	st->ref_block.freq_hz = 50000000;
-	st->ref_block.admv4420_ref_single_ended = false;
+	st->ref_block.ref_single_ended = false;
 	st->ref_block.doubler_en = false;
 	st->ref_block.divide_by_2_en = false;
 	st->ref_block.divider = 1;
@@ -564,32 +565,32 @@ static int admv4420_setup(struct iio_dev *indio_dev)
 
 	ret = regmap_write(st->regmap, ADMV4420_R_DIV_L,
 			   FIELD_GET(0xFF, st->ref_block.divider));
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	ret = regmap_write(st->regmap, ADMV4420_R_DIV_H,
 			   FIELD_GET(0xFF00, st->ref_block.divider));
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	ret = regmap_write(st->regmap, ADMV4420_REFERENCE,
 			   st->ref_block.divide_by_2_en |
-			   ADMV4420_REFERENCE_IN_MODE(st->ref_block.admv4420_ref_single_ended) |
+			   ADMV4420_REFERENCE_IN_MODE(st->ref_block.ref_single_ended) |
 			   ADMV4420_REFERENCE_DOUBLER(st->ref_block.doubler_en));
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	ret = admv4420_set_n_counter(st, st->n_counter.int_val, st->n_counter.frac_val, st->n_counter.mod_val);
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	ret = regmap_write(st->regmap, ADMV4420_PLL_MUX_SEL, st->mux_sel);
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	ret = regmap_write(st->regmap, ADMV4420_ENABLES, ENABLE_PLL | ENABLE_LO | ENABLE_VCO |
 			   ENABLE_IFAMP | ENABLE_MIXER | ENABLE_LNA);
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	admv4420_calc_pfd_freq(st);
@@ -627,7 +628,7 @@ static int admv4420_probe(struct spi_device *spi)
 	indio_dev->num_channels = ARRAY_SIZE(admv4420_channels);
 
 	ret = admv4420_setup(indio_dev);
-	if (ret < 0) {
+	if (ret) {
 		dev_err(&spi->dev, "Setup ADMV4420 failed (%d)\n", ret);
 		return ret;
 	}
