@@ -771,9 +771,16 @@ static int adxl367_read_raw(struct iio_dev *indio_dev,
 			*val = adxl367_range_scale_tbl[st->range][0];
 			*val2 = adxl367_range_scale_tbl[st->range][1];
 			return IIO_VAL_INT_PLUS_NANO;
+		case IIO_TEMP:
+			*val = 1;
+			*val2 = 54;
+			return IIO_VAL_FRACTIONAL;
 		default:
 			return -EINVAL;
 		}
+	case IIO_CHAN_INFO_OFFSET:
+		*val = 165 - 25 * 54;
+		return IIO_VAL_INT;
 	case IIO_CHAN_INFO_SAMP_FREQ:
 		*val = adxl367_samp_freq_tbl[st->odr][0];
 		*val2 = adxl367_samp_freq_tbl[st->odr][1];
@@ -1261,7 +1268,9 @@ static const struct iio_event_spec adxl367_events[] = {
 	.channel2 = IIO_MOD_##axis,					\
 	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),			\
 	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),		\
+	.info_mask_shared_by_type_avail = BIT(IIO_CHAN_INFO_SCALE),	\
 	.info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SAMP_FREQ),	\
+	.info_mask_shared_by_all_avail = BIT(IIO_CHAN_INFO_SAMP_FREQ),	\
 	.event_spec = adxl367_events,					\
 	.num_event_specs = ARRAY_SIZE(adxl367_events),			\
 	ADXL367_14BIT_SCAN_INFO(index),					\
@@ -1275,7 +1284,9 @@ static const struct iio_chan_spec adxl367_channels[] = {
 		.type = IIO_TEMP,
 		.address = ADXL367_REG_TEMP_DATA_H,
 		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
-				      BIT(IIO_CHAN_INFO_ENABLE),
+				      BIT(IIO_CHAN_INFO_ENABLE) |
+				      BIT(IIO_CHAN_INFO_OFFSET) |
+				      BIT(IIO_CHAN_INFO_SCALE),
 		.info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SAMP_FREQ),
 		ADXL367_14BIT_SCAN_INFO(3),
 	},
