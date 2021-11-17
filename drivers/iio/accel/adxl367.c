@@ -779,7 +779,7 @@ static int adxl367_read_raw(struct iio_dev *indio_dev,
 			return -EINVAL;
 		}
 	case IIO_CHAN_INFO_OFFSET:
-		*val = 165 - 25 * 54;
+		*val = -165 + 25 * 54;
 		return IIO_VAL_INT;
 	case IIO_CHAN_INFO_SAMP_FREQ:
 		*val = adxl367_samp_freq_tbl[st->odr][0];
