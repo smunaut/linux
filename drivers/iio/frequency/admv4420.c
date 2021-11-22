@@ -64,8 +64,8 @@
 #define ADMV4420_N_COUNTER_FRAC_MAX		GENMASK(23, 0)
 #define ADMV4420_N_COUNTER_MOD_MAX		GENMASK(23, 0)
 
-#define ADMV4420_INT_L_MASK			GENMASK(7, 0)
-#define ADMV4420_INT_H_MASK			GENMASK(15, 8)
+#define ADMV4420_L_MASK				GENMASK(7, 0)
+#define ADMV4420_H_MASK				GENMASK(15, 8)
 #define ADMV4420_FRAC_L_MASK			GENMASK(7, 0)
 #define ADMV4420_FRAC_M_MASK			GENMASK(15, 8)
 #define ADMV4420_FRAC_H_MASK			GENMASK(23, 16)
@@ -80,8 +80,13 @@
 #define ENABLE_MIXER				BIT(1)
 #define ENABLE_LNA				BIT(0)
 
-#define ADAR1000_SCRATCH_PAD_VAL_1	0xAD
-#define ADAR1000_SCRATCH_PAD_VAL_2	0xEA
+#define ADAR1000_SCRATCH_PAD_VAL_1		0xAD
+#define ADAR1000_SCRATCH_PAD_VAL_2		0xEA
+#define ADMV4420_DEF_REF_HZ			50000000
+#define ADMV4420_DEF_REF_DIVIDER		1
+#define ADMV4420_DEF_NC_INT			0xA7
+#define ADMV4420_DEF_NC_FRAC			0x02
+#define ADMV4420_DEF_NC_MOD			0x04
 
 enum admv4420_option_st {
 	ADMV4420_DISABLED,
@@ -203,11 +208,11 @@ static int admv4420_set_n_counter(struct admv4420_state *st, u32 int_val, u32 fr
 	if (ret)
 		return ret;
 
-	ret = regmap_write(st->regmap, ADMV4420_INT_H, FIELD_GET(ADMV4420_INT_H_MASK, int_val));
+	ret = regmap_write(st->regmap, ADMV4420_INT_H, FIELD_GET(ADMV4420_H_MASK, int_val));
 	if (ret)
 		return ret;
 
-	return regmap_write(st->regmap, ADMV4420_INT_L, FIELD_GET(ADMV4420_INT_L_MASK, int_val));
+	return regmap_write(st->regmap, ADMV4420_INT_L, FIELD_GET(ADMV4420_L_MASK, int_val));
 }
 
 static int admv4420_read_raw(struct iio_dev *indio_dev,
@@ -299,27 +304,27 @@ static int admv4420_setup(struct iio_dev *indio_dev)
 		return -EIO;
 	}
 
-	st->ref_block.freq_hz = 50000000;
+	st->ref_block.freq_hz = ADMV4420_DEF_REF_HZ;
 	st->ref_block.ref_single_ended = false;
 	st->ref_block.doubler_en = false;
 	st->ref_block.divide_by_2_en = false;
-	st->ref_block.divider = 1;
+	st->ref_block.divider = ADMV4420_DEF_REF_DIVIDER;
 
-	st->n_counter.int_val = 0xA7;
-	st->n_counter.frac_val = 0x02;
-	st->n_counter.mod_val = 0x04;
+	st->n_counter.int_val = ADMV4420_DEF_NC_INT;
+	st->n_counter.frac_val = ADMV4420_DEF_NC_FRAC;
+	st->n_counter.mod_val = ADMV4420_DEF_NC_MOD;
 
 	st->mux_sel = ADMV4420_LOCK_DTCT;
 
 	admv4420_dt_parse(st);
 
 	ret = regmap_write(st->regmap, ADMV4420_R_DIV_L,
-			   FIELD_GET(0xFF, st->ref_block.divider));
+			   FIELD_GET(ADMV4420_L_MASK, st->ref_block.divider));
 	if (ret)
 		return ret;
 
 	ret = regmap_write(st->regmap, ADMV4420_R_DIV_H,
-			   FIELD_GET(0xFF00, st->ref_block.divider));
+			   FIELD_GET(ADMV4420_H_MASK, st->ref_block.divider));
 	if (ret)
 		return ret;
 
@@ -330,7 +335,8 @@ static int admv4420_setup(struct iio_dev *indio_dev)
 	if (ret)
 		return ret;
 
-	ret = admv4420_set_n_counter(st, st->n_counter.int_val, st->n_counter.frac_val, st->n_counter.mod_val);
+	ret = admv4420_set_n_counter(st, st->n_counter.int_val, st->n_counter.frac_val,
+				     st->n_counter.mod_val);
 	if (ret)
 		return ret;
 
