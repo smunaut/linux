@@ -1074,20 +1074,27 @@ static int adxl367_write_event_config(struct iio_dev *indio_dev,
 		return -EINVAL;
 	}
 
+	mutex_lock(&st->lock);
+
 	ret = adxl367_set_measure_en(st, false);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = adxl367_set_act_interrupt_en(st, act, state);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = adxl367_set_act_en(st, act, state ? ADCL367_ACT_REF_ENABLED
 						: ADXL367_ACT_DISABLED);
 	if (ret)
-		return ret;
+		goto out;
 
-	return adxl367_set_measure_en(st, true);
+	ret = adxl367_set_measure_en(st, true);
+
+out:
+	mutex_unlock(&st->lock);
+
+	return ret;
 }
 
 static ssize_t adxl367_get_fifo_enabled(struct device *dev,
