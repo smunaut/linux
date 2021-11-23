@@ -612,6 +612,30 @@ out:
 	return ret;
 }
 
+static int _adxl367_set_odr(struct adxl367_state *st, enum adxl367_odr odr)
+{
+	int ret;
+
+	ret = regmap_update_bits(st->regmap, ADXL367_REG_FILTER_CTL,
+				 ADXL367_FILTER_CTL_ODR_MASK,
+				 ADXL367_FILTER_CTL_ODR(odr));
+	if (ret)
+		return ret;
+
+	/* Activity timers depend on ODR */
+	ret = _adxl367_set_act_time_ms(st, st->act_time_ms);
+	if (ret)
+		return ret;
+
+	ret = _adxl367_set_inact_time_ms(st, st->inact_time_ms);
+	if (ret)
+		return ret;
+
+	st->odr = odr;
+
+	return 0;
+}
+
 static int adxl367_set_odr(struct adxl367_state *st, enum adxl367_odr odr)
 {
 	int ret;
@@ -622,26 +646,11 @@ static int adxl367_set_odr(struct adxl367_state *st, enum adxl367_odr odr)
 	if (ret)
 		goto out;
 
-	ret = regmap_update_bits(st->regmap, ADXL367_REG_FILTER_CTL,
-				 ADXL367_FILTER_CTL_ODR_MASK,
-				 ADXL367_FILTER_CTL_ODR(odr));
-	if (ret)
-		goto out;
-
-	/* Activity timers depend on ODR */
-	ret = _adxl367_set_act_time_ms(st, st->act_time_ms);
-	if (ret)
-		goto out;
-
-	ret = _adxl367_set_inact_time_ms(st, st->inact_time_ms);
+	ret = _adxl367_set_odr(st, odr);
 	if (ret)
 		goto out;
 
 	ret = adxl367_set_measure_en(st, true);
-	if (ret)
-		goto out;
-
-	st->odr = odr;
 
 out:
 	mutex_unlock(&st->lock);
@@ -1491,7 +1500,7 @@ static int adxl367_setup(struct adxl367_state *st)
 	if (ret)
 		return ret;
 
-	ret = adxl367_set_odr(st, ADXL367_ODR_400HZ);
+	ret = _adxl367_set_odr(st, ADXL367_ODR_400HZ);
 	if (ret)
 		return ret;
 
