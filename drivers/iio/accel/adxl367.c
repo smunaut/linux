@@ -663,15 +663,32 @@ static int adxl367_set_adc_temp_en(struct adxl367_state *st, bool en)
 				  ADXL367_ADC_EN(en));
 }
 
+static int adxl367_get_chan_type_adc_mode(enum iio_chan_type type,
+					  enum adxl367_adc_mode *mode)
+{
+	switch (type) {
+	case IIO_TEMP:
+		*mode = ADXL367_ADC_MODE_TEMP;
+		return 0;
+	case IIO_VOLTAGE:
+		*mode = ADXL367_ADC_MODE_EX;
+		return 0;
+	default:
+		return -EINVAL;
+	}
+}
+
 static int adxl367_set_adc_en(struct adxl367_state *st,
 			      enum adxl367_adc_mode adc_mode, bool en)
 {
-	if (adc_mode == ADXL367_ADC_MODE_TEMP)
+	switch (adc_mode) {
+	case ADXL367_ADC_MODE_TEMP:
 		return adxl367_set_adc_temp_en(st, en);
-	else if (adc_mode == ADXL367_ADC_MODE_EX)
+	case ADXL367_ADC_MODE_EX:
 		return adxl367_set_adc_ex_en(st, en);
-
-	return 0;
+	default:
+		return 0;
+	}
 }
 
 static int adxl367_set_adc_mode(struct adxl367_state *st,
@@ -679,17 +696,40 @@ static int adxl367_set_adc_mode(struct adxl367_state *st,
 {
 	int ret;
 
-	mutex_lock(&st->lock);
-
 	ret = adxl367_set_adc_en(st, st->adc_mode, false);
 	if (ret)
-		goto out;
+		return ret;
 
 	ret = adxl367_set_adc_en(st, adc_mode, true);
 	if (ret)
-		goto out;
+		return ret;
 
 	st->adc_mode = adc_mode;
+
+	return 0;
+}
+
+static int adxl367_set_adc_mode_en(struct adxl367_state *st,
+				   enum iio_chan_type type,
+				   bool en)
+{
+	enum adxl367_adc_mode adc_mode;
+	int ret;
+
+	ret = adxl367_get_chan_type_adc_mode(type, &adc_mode);
+	if (ret)
+		return ret;
+
+	mutex_lock(&st->lock);
+	if (!en && st->adc_mode != adc_mode) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (!en)
+		adc_mode = ADXL367_ADC_MODE_NONE;
+
+	ret = adxl367_set_adc_mode(st, adc_mode);
 
 out:
 	mutex_unlock(&st->lock);
@@ -924,24 +964,7 @@ static int adxl367_write_raw(struct iio_dev *indio_dev,
 		return adxl367_set_range(st, range);
 	}
 	case IIO_CHAN_INFO_ENABLE:
-		switch (chan->type) {
-		case IIO_TEMP:
-			if (!val && st->adc_mode != ADXL367_ADC_MODE_TEMP)
-				return 0;
-
-			val = val ? ADXL367_ADC_MODE_TEMP
-				  : ADXL367_ADC_MODE_NONE;
-			return adxl367_set_adc_mode(st, val);
-		case IIO_VOLTAGE:
-			if (!val && st->adc_mode != ADXL367_ADC_MODE_EX)
-				return 0;
-
-			val = val ? ADXL367_ADC_MODE_EX
-				  : ADXL367_ADC_MODE_NONE;
-			return adxl367_set_adc_mode(st, val);
-		default:
-			return -EINVAL;
-		}
+		return adxl367_set_adc_mode_en(st, chan->type, val);
 	default:
 		return -EINVAL;
 	}
