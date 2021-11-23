@@ -311,17 +311,19 @@ static int adxl367_set_act_threshold(struct adxl367_state *st,
 	reg_seq[0].def = ADXL367_THRESH_VAL_TO_H(threshold);
 	reg_seq[1].def = ADXL367_THRESH_VAL_TO_L(threshold);
 
+	mutex_lock(&st->lock);
+
 	ret = adxl367_set_measure_en(st, false);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = regmap_multi_reg_write(st->regmap, reg_seq, ARRAY_SIZE(reg_seq));
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = adxl367_set_measure_en(st, true);
 	if (ret)
-		return ret;
+		goto out;
 
 	switch (act) {
 	case ADXL367_ACTIVITY:
@@ -332,7 +334,10 @@ static int adxl367_set_act_threshold(struct adxl367_state *st,
 		break;
 	}
 
-	return 0;
+out:
+	mutex_unlock(&st->lock);
+
+	return ret;
 }
 
 static int adxl367_set_act_proc_mode(struct adxl367_state *st,
