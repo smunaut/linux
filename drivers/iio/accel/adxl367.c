@@ -1273,19 +1273,26 @@ static int adxl367_buffer_postenable(struct iio_dev *indio_dev)
 	struct adxl367_state *st = iio_priv(indio_dev);
 	int ret;
 
+	mutex_lock(&st->lock);
+
 	ret = adxl367_set_measure_en(st, false);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = adxl367_set_fifo_full_interrupt_en(st, true);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = adxl367_set_fifo_mode(st, ADXL367_FIFO_MODE_STREAM);
 	if (ret)
-		return ret;
+		goto out;
 
-	return adxl367_set_measure_en(st, true);
+	ret = adxl367_set_measure_en(st, true);
+
+out:
+	mutex_unlock(&st->lock);
+
+	return ret;
 }
 
 static int adxl367_buffer_predisable(struct iio_dev *indio_dev)
@@ -1293,19 +1300,26 @@ static int adxl367_buffer_predisable(struct iio_dev *indio_dev)
 	struct adxl367_state *st = iio_priv(indio_dev);
 	int ret;
 
+	mutex_lock(&st->lock);
+
 	ret = adxl367_set_measure_en(st, false);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = adxl367_set_fifo_mode(st, ADXL367_FIFO_MODE_DISABLED);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = adxl367_set_fifo_full_interrupt_en(st, false);
 	if (ret)
-		return ret;
+		goto out;
 
-	return adxl367_set_measure_en(st, true);
+	ret = adxl367_set_measure_en(st, true);
+
+out:
+	mutex_unlock(&st->lock);
+
+	return ret;
 }
 
 static int adxl367_validate_trigger(struct iio_dev *indio_dev,
