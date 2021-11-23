@@ -300,20 +300,23 @@ static int adxl367_set_act_threshold(struct adxl367_state *st,
 				     unsigned int threshold)
 {
 	u8 reg = adxl367_threshold_h_reg_tbl[act];
-	u8 buf[2];
+	struct reg_sequence reg_seq[] = {
+		{ reg },
+		{ reg + 1 },
+	};
 	int ret;
 
 	if (threshold > ADXL367_THRESH_MAX)
 		return -EINVAL;
 
-	buf[0] = ADXL367_THRESH_VAL_TO_H(threshold);
-	buf[1] = ADXL367_THRESH_VAL_TO_L(threshold);
+	reg_seq[0].def = ADXL367_THRESH_VAL_TO_H(threshold);
+	reg_seq[1].def = ADXL367_THRESH_VAL_TO_L(threshold);
 
 	ret = adxl367_set_measure_en(st, false);
 	if (ret)
 		return ret;
 
-	ret = regmap_bulk_write(st->regmap, reg, buf, sizeof(buf));
+	ret = regmap_multi_reg_write(st->regmap, reg_seq, ARRAY_SIZE(reg_seq));
 	if (ret)
 		return ret;
 
@@ -512,22 +515,24 @@ static int adxl367_set_act_time_ms(struct adxl367_state *st, unsigned int ms)
 
 static int adxl367_set_inact_time_ms(struct adxl367_state *st, unsigned int ms)
 {
+	struct reg_sequence reg_seq[] = {
+		{ ADXL367_REG_TIME_INACT_H },
+		{ ADXL367_REG_TIME_INACT_L },
+	};
 	unsigned int val = adxl367_time_ms_to_samples(st, ms);
-	u8 buf[2];
 	int ret;
 
 	if (val > ADXL367_TIME_INACT_MAX)
 		val = ADXL367_TIME_INACT_MAX;
 
-	buf[0] = ADXL367_TIME_INACT_VAL_TO_H(val);
-	buf[1] = ADXL367_TIME_INACT_VAL_TO_L(val);
+	reg_seq[0].def = ADXL367_TIME_INACT_VAL_TO_H(val);
+	reg_seq[1].def = ADXL367_TIME_INACT_VAL_TO_L(val);
 
 	ret = adxl367_set_measure_en(st, false);
 	if (ret)
 		return ret;
 
-	ret = regmap_bulk_write(st->regmap, ADXL367_REG_TIME_INACT_H, buf,
-				sizeof(buf));
+	ret = regmap_multi_reg_write(st->regmap, reg_seq, ARRAY_SIZE(reg_seq));
 	if (ret)
 		return ret;
 
