@@ -649,17 +649,22 @@ static int adxl367_set_adc_mode(struct adxl367_state *st,
 {
 	int ret;
 
+	mutex_lock(&st->lock);
+
 	ret = adxl367_set_adc_en(st, st->adc_mode, false);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = adxl367_set_adc_en(st, adc_mode, true);
 	if (ret)
-		return ret;
+		goto out;
 
 	st->adc_mode = adc_mode;
 
-	return 0;
+out:
+	mutex_unlock(&st->lock);
+
+	return ret;
 }
 
 static int adxl367_find_odr(struct adxl367_state *st, int val, int val2,
