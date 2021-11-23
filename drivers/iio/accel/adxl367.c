@@ -1424,7 +1424,6 @@ int adxl367_probe(struct device *dev, const struct adxl367_ops *ops,
 
 	iio_buffer_set_attrs(indio_dev->buffer, adxl367_fifo_attributes);
 
-
 	if (irq) {
 		ret = adxl367_setup_irq(indio_dev, irq);
 		if (ret)
