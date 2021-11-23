@@ -853,8 +853,10 @@ static int adxl367_read_raw(struct iio_dev *indio_dev,
 	case IIO_CHAN_INFO_SCALE:
 		switch (chan->type) {
 		case IIO_ACCEL:
+			mutex_lock(&st->lock);
 			*val = adxl367_range_scale_tbl[st->range][0];
 			*val2 = adxl367_range_scale_tbl[st->range][1];
+			mutex_unlock(&st->lock);
 			return IIO_VAL_INT_PLUS_NANO;
 		case IIO_TEMP:
 			*val = 1;
@@ -867,16 +869,22 @@ static int adxl367_read_raw(struct iio_dev *indio_dev,
 		*val = -165 + 25 * 54;
 		return IIO_VAL_INT;
 	case IIO_CHAN_INFO_SAMP_FREQ:
+		mutex_lock(&st->lock);
 		*val = adxl367_samp_freq_tbl[st->odr][0];
 		*val2 = adxl367_samp_freq_tbl[st->odr][1];
+		mutex_unlock(&st->lock);
 		return IIO_VAL_INT_PLUS_MICRO;
 	case IIO_CHAN_INFO_ENABLE:
 		switch (chan->type) {
 		case IIO_TEMP:
+			mutex_lock(&st->lock);
 			*val = st->adc_mode == ADXL367_ADC_MODE_TEMP;
+			mutex_unlock(&st->lock);
 			return IIO_VAL_INT;
 		case IIO_VOLTAGE:
+			mutex_lock(&st->lock);
 			*val = st->adc_mode == ADXL367_ADC_MODE_EX;
+			mutex_unlock(&st->lock);
 			return IIO_VAL_INT;
 		default:
 			return -EINVAL;
@@ -991,10 +999,14 @@ static int adxl367_read_event_value(struct iio_dev *indio_dev,
 	case IIO_EV_INFO_VALUE: {
 		switch (dir) {
 		case IIO_EV_DIR_RISING:
+			mutex_lock(&st->lock);
 			*val = st->act_threshold;
+			mutex_unlock(&st->lock);
 			return IIO_VAL_INT;
 		case IIO_EV_DIR_FALLING:
+			mutex_lock(&st->lock);
 			*val = st->inact_threshold;
+			mutex_unlock(&st->lock);
 			return IIO_VAL_INT;
 		default:
 			return -EINVAL;
@@ -1003,11 +1015,15 @@ static int adxl367_read_event_value(struct iio_dev *indio_dev,
 	case IIO_EV_INFO_PERIOD:
 		switch (dir) {
 		case IIO_EV_DIR_RISING:
+			mutex_lock(&st->lock);
 			*val = st->act_time_ms;
+			mutex_unlock(&st->lock);
 			*val2 = 1000;
 			return IIO_VAL_FRACTIONAL;
 		case IIO_EV_DIR_FALLING:
+			mutex_lock(&st->lock);
 			*val = st->inact_time_ms;
+			mutex_unlock(&st->lock);
 			*val2 = 1000;
 			return IIO_VAL_FRACTIONAL;
 		default:
