@@ -180,6 +180,8 @@ struct adxl367_state {
 	struct regmap		*regmap;
 	struct iio_trigger	*dready_trig;
 
+	struct mutex		lock;
+
 	enum adxl367_odr	odr;
 	enum adxl367_range	range;
 	enum adxl367_adc_mode	adc_mode;
@@ -667,10 +669,14 @@ static int adxl367_read_sample(struct iio_dev *indio_dev,
 	if (ret)
 		return ret;
 
+	mutex_lock(&st->lock);
+
 	ret = regmap_bulk_read(st->regmap, chan->address, &st->sample_buf,
 			       sizeof(st->sample_buf));
 	sample = be16_to_cpu(st->sample_buf) >> chan->scan_type.shift;
 	*val = sign_extend32(sample, chan->scan_type.realbits - 1);
+
+	mutex_unlock(&st->lock);
 
 	iio_device_release_direct_mode(indio_dev);
 
@@ -1394,6 +1400,8 @@ int adxl367_probe(struct device *dev, const struct adxl367_ops *ops,
 	st->regmap = regmap;
 	st->context = context;
 	st->ops = ops;
+
+	mutex_init(&st->lock);
 
 	indio_dev->channels = adxl367_channels;
 	indio_dev->num_channels = ARRAY_SIZE(adxl367_channels);
