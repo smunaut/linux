@@ -791,7 +791,6 @@ static int adxl367_read_raw(struct iio_dev *indio_dev,
 			    int *val, int *val2, long info)
 {
 	struct adxl367_state *st = iio_priv(indio_dev);
-	int ret;
 
 	switch (info) {
 	case IIO_CHAN_INFO_RAW:
