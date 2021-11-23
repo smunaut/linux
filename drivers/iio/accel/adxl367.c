@@ -1472,11 +1472,11 @@ static int adxl367_setup(struct adxl367_state *st)
 	if (ret)
 		return ret;
 
-	ret = adxl367_set_act_time_ms(st, ADXL367_ACTIVITY, 10);
+	ret = _adxl367_set_act_time_ms(st, 10);
 	if (ret)
 		return ret;
 
-	ret = adxl367_set_inact_time_ms(st, ADXL367_INACTIVITY, 10000);
+	ret = _adxl367_set_inact_time_ms(st, 10000);
 	if (ret)
 		return ret;
 
