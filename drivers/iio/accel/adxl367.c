@@ -508,7 +508,7 @@ static int adxl367_time_ms_to_samples(struct adxl367_state *st, unsigned int ms)
 	return DIV_ROUND_CLOSEST(ms * freq_dhz, 10000);
 }
 
-static int adxl367_set_act_time_ms(struct adxl367_state *st, unsigned int ms)
+static int _adxl367_set_act_time_ms(struct adxl367_state *st, unsigned int ms)
 {
 	unsigned int val = adxl367_time_ms_to_samples(st, ms);
 	int ret;
@@ -516,24 +516,16 @@ static int adxl367_set_act_time_ms(struct adxl367_state *st, unsigned int ms)
 	if (val > ADXL367_TIME_ACT_MAX)
 		val = ADXL367_TIME_ACT_MAX;
 
-	ret = adxl367_set_measure_en(st, false);
-	if (ret)
-		return ret;
-
 	ret = regmap_write(st->regmap, ADXL367_REG_TIME_ACT, val);
-	if (ret)
-		return ret;
-
-	ret = adxl367_set_measure_en(st, true);
 	if (ret)
 		return ret;
 
 	st->act_time_ms = ms;
 
-	return ret;
+	return 0;
 }
 
-static int adxl367_set_inact_time_ms(struct adxl367_state *st, unsigned int ms)
+static int _adxl367_set_inact_time_ms(struct adxl367_state *st, unsigned int ms)
 {
 	struct reg_sequence reg_seq[] = {
 		{ ADXL367_REG_TIME_INACT_H },
@@ -548,19 +540,44 @@ static int adxl367_set_inact_time_ms(struct adxl367_state *st, unsigned int ms)
 	reg_seq[0].def = ADXL367_TIME_INACT_VAL_TO_H(val);
 	reg_seq[1].def = ADXL367_TIME_INACT_VAL_TO_L(val);
 
-	ret = adxl367_set_measure_en(st, false);
-	if (ret)
-		return ret;
-
 	ret = regmap_multi_reg_write(st->regmap, reg_seq, ARRAY_SIZE(reg_seq));
 	if (ret)
 		return ret;
 
-	ret = adxl367_set_measure_en(st, true);
-	if (ret)
-		return ret;
-
 	st->inact_time_ms = ms;
+
+	return 0;
+}
+
+
+static int adxl367_set_act_time_ms(struct adxl367_state *st,
+				   enum adxl367_activity_type act,
+				   unsigned int ms)
+{
+	int ret;
+
+	mutex_lock(&st->lock);
+
+	ret = adxl367_set_measure_en(st, false);
+	if (ret)
+		goto out;
+
+	switch (act) {
+	case ADXL367_ACTIVITY:
+		ret = _adxl367_set_act_time_ms(st, ms);
+		break;
+	case ADXL367_INACTIVITY:
+		ret = _adxl367_set_inact_time_ms(st, ms);
+		break;
+	}
+
+	if (ret)
+		goto out;
+
+	ret = adxl367_set_measure_en(st, true);
+
+out:
+	mutex_unlock(&st->lock);
 
 	return ret;
 }
@@ -569,30 +586,35 @@ static int adxl367_set_odr(struct adxl367_state *st, enum adxl367_odr odr)
 {
 	int ret;
 
+	mutex_lock(&st->lock);
+
 	ret = adxl367_set_measure_en(st, false);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = regmap_update_bits(st->regmap, ADXL367_REG_FILTER_CTL,
 				 ADXL367_FILTER_CTL_ODR_MASK,
 				 ADXL367_FILTER_CTL_ODR(odr));
 	if (ret)
-		return ret;
+		goto out;
+
+	/* Activity timers depend on ODR */
+	ret = _adxl367_set_act_time_ms(st, st->act_time_ms);
+	if (ret)
+		goto out;
+
+	ret = _adxl367_set_inact_time_ms(st, st->inact_time_ms);
+	if (ret)
+		goto out;
 
 	ret = adxl367_set_measure_en(st, true);
 	if (ret)
-		return ret;
+		goto out;
 
 	st->odr = odr;
 
-	/* Activity timers depend on ODR */
-	ret = adxl367_set_act_time_ms(st, st->act_time_ms);
-	if (ret)
-		return ret;
-
-	ret = adxl367_set_inact_time_ms(st, st->inact_time_ms);
-	if (ret)
-		return ret;
+out:
+	mutex_unlock(&st->lock);
 
 	return 0;
 }
@@ -992,9 +1014,11 @@ static int adxl367_write_event_value(struct iio_dev *indio_dev,
 		val = val * 1000 + DIV_ROUND_UP(val2, 1000);
 		switch (dir) {
 		case IIO_EV_DIR_RISING:
-			return adxl367_set_act_time_ms(st, val);
+			return adxl367_set_act_time_ms(st, ADXL367_ACTIVITY,
+						       val);
 		case IIO_EV_DIR_FALLING:
-			return adxl367_set_inact_time_ms(st, val);
+			return adxl367_set_act_time_ms(st, ADXL367_INACTIVITY,
+						       val);
 		default:
 			return -EINVAL;
 		}
