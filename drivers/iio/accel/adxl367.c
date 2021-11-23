@@ -4,13 +4,13 @@
  * Author: Cosmin Tanislav <cosmin.tanislav@analog.com>
  */
 
+#include <asm/unaligned.h>
 #include <linux/bitfield.h>
 #include <linux/bitops.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/module.h>
 #include <linux/regmap.h>
-
 #include <linux/iio/iio.h>
 #include <linux/iio/sysfs.h>
 #include <linux/iio/buffer.h>
@@ -35,7 +35,6 @@
 #define ADXL367_REG_FIFO_ENT_L		0x0C
 #define ADXL367_REG_FIFO_ENT_H		0x0D
 #define ADXL367_FIFO_ENT_H_MASK		GENMASK(1, 0)
-#define ADXL367_FIFO_ENT_TO_VAL(h, l)	((((h) & ADXL367_FIFO_ENT_H_MASK) << 8) | (l))
 
 #define ADXL367_REG_X_DATA_H		0x0E
 #define ADXL367_REG_X_DATA_L		0x0F
@@ -198,6 +197,7 @@ struct adxl367_state {
 	unsigned int	fifo_watermark;
 
 	__be16		fifo_buf[ADXL367_FIFO_SIZE] ____cacheline_aligned;
+	u8		status_buf[3] ____cacheline_aligned;
 };
 
 static const unsigned int adxl367_threshold_h_reg_tbl[] = {
@@ -678,17 +678,18 @@ static int adxl367_read_axis(struct adxl367_state *st,
 static int adxl367_get_status(struct adxl367_state *st, u8 *status,
 			      u16 *fifo_entries)
 {
-	u8 buf[3];
 	int ret;
 
 	/* Read STATUS, FIFO_ENT_L and FIFO_ENT_H */
 	ret = regmap_bulk_read(st->regmap, ADXL367_REG_STATUS,
-			       buf, sizeof(buf));
+			       st->status_buf, ARRAY_SIZE(st->status_buf));
 	if (ret)
 		return ret;
 
-	*status = buf[0];
-	*fifo_entries = ADXL367_FIFO_ENT_TO_VAL(buf[2], buf[1]);
+	st->status_buf[1] &= ADXL367_FIFO_ENT_H_MASK;
+
+	*status = st->status_buf[0];
+	*fifo_entries = get_unaligned_le16(&st->status_buf[1]);
 
 	return 0;
 }
