@@ -616,7 +616,7 @@ static int adxl367_set_odr(struct adxl367_state *st, enum adxl367_odr odr)
 out:
 	mutex_unlock(&st->lock);
 
-	return 0;
+	return ret;
 }
 
 static int adxl367_set_adc_ex_en(struct adxl367_state *st, bool en)
