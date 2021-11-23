@@ -463,34 +463,39 @@ static int adxl367_set_range(struct adxl367_state *st,
 {
 	int ret;
 
+	mutex_lock(&st->lock);
+
 	ret = adxl367_set_measure_en(st, false);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = regmap_update_bits(st->regmap, ADXL367_REG_FILTER_CTL,
 				 ADXL367_FILTER_CTL_RANGE_MASK,
 				 ADXL367_FILTER_CTL_RANGE(range));
 	if (ret)
-		return ret;
-
-	ret = adxl367_set_measure_en(st, true);
-	if (ret)
-		return ret;
+		goto out;
 
 	adxl367_scale_act_thresholds(st, st->range, range);
 
+	/* Activity thresholds depend on range */
+	ret = _adxl367_set_act_threshold(st, ADXL367_ACTIVITY,
+					 st->act_threshold);
+	if (ret)
+		goto out;
+
+	ret = _adxl367_set_act_threshold(st, ADXL367_INACTIVITY,
+					 st->inact_threshold);
+	if (ret)
+		goto out;
+
+	ret = adxl367_set_measure_en(st, true);
+	if (ret)
+		goto out;
+
 	st->range = range;
 
-	/* Activity thresholds depend on range */
-	ret = adxl367_set_act_threshold(st, ADXL367_ACTIVITY,
-					st->act_threshold);
-	if (ret)
-		return ret;
-
-	ret = adxl367_set_act_threshold(st, ADXL367_INACTIVITY,
-					st->inact_threshold);
-	if (ret)
-		return ret;
+out:
+	mutex_unlock(&st->lock);
 
 	return 0;
 }
