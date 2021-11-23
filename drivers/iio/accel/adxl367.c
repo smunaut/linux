@@ -193,6 +193,7 @@ struct adxl367_state {
 	unsigned int	fifo_watermark;
 
 	__be16		fifo_buf[ADXL367_FIFO_SIZE] ____cacheline_aligned;
+	__be16		sample_buf ____cacheline_aligned;
 	u8		status_buf[3] ____cacheline_aligned;
 };
 
@@ -654,21 +655,26 @@ static int adxl367_find_range(struct adxl367_state *st, int val, int val2,
 	return 0;
 }
 
-static int adxl367_read_axis(struct adxl367_state *st,
-			     struct iio_chan_spec const *chan,
-			     int *val)
+static int adxl367_read_sample(struct iio_dev *indio_dev,
+			       struct iio_chan_spec const *chan,
+			       int *val)
 {
-	__be16 buf;
+	struct adxl367_state *st = iio_priv(indio_dev);
+	u16 sample;
 	int ret;
 
-	ret = regmap_bulk_read(st->regmap, chan->address, &buf, sizeof(buf));
+	ret = iio_device_claim_direct_mode(indio_dev);
 	if (ret)
 		return ret;
 
-	*val = sign_extend32(be16_to_cpu(buf) >> chan->scan_type.shift,
-			     chan->scan_type.realbits - 1);
+	ret = regmap_bulk_read(st->regmap, chan->address, &st->sample_buf,
+			       sizeof(st->sample_buf));
+	sample = be16_to_cpu(st->sample_buf) >> chan->scan_type.shift;
+	*val = sign_extend32(sample, chan->scan_type.realbits - 1);
 
-	return 0;
+	iio_device_release_direct_mode(indio_dev);
+
+	return ret ?: IIO_VAL_INT;
 }
 
 static int adxl367_get_status(struct adxl367_state *st, u8 *status,
@@ -760,13 +766,7 @@ static int adxl367_read_raw(struct iio_dev *indio_dev,
 
 	switch (info) {
 	case IIO_CHAN_INFO_RAW:
-		ret = iio_device_claim_direct_mode(indio_dev);
-		if (ret)
-			return ret;
-
-		ret = adxl367_read_axis(st, chan, val);
-		iio_device_release_direct_mode(indio_dev);
-		return ret ?: IIO_VAL_INT;
+		return adxl367_read_sample(indio_dev, chan, val);
 	case IIO_CHAN_INFO_SCALE:
 		switch (chan->type) {
 		case IIO_ACCEL:
