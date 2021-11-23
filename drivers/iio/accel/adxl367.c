@@ -436,15 +436,17 @@ static int adxl367_set_fifo_format(struct adxl367_state *st,
 				  ADXL367_FIFO_CTL_FORMAT(fifo_format));
 }
 
-static int adxl367_update_fifo_samples(struct adxl367_state *st)
+static int adxl367_set_fifo_samples(struct adxl367_state *st,
+				    unsigned int fifo_watermark,
+				    unsigned int fifo_set_size)
 {
-	unsigned int fifo_samples = st->fifo_watermark * st->fifo_set_size;
+	unsigned int fifo_samples = fifo_watermark * fifo_set_size;
 	int ret;
 
 	if (fifo_samples > ADXL367_FIFO_MAX_WATERMARK)
 		fifo_samples = ADXL367_FIFO_MAX_WATERMARK;
 
-	fifo_samples /= st->fifo_set_size;
+	fifo_samples /= fifo_set_size;
 
 	ret = regmap_update_bits(st->regmap, ADXL367_REG_FIFO_CTL,
 				 ADXL367_FIFO_CTL_SAMPLES_MASK,
@@ -454,6 +456,34 @@ static int adxl367_update_fifo_samples(struct adxl367_state *st)
 
 	return regmap_write(st->regmap, ADXL367_REG_FIFO_SAMPLES,
 			    ADXL367_FIFO_SAMPLES_L(fifo_samples));
+}
+
+static int adxl367_set_fifo_set_size(struct adxl367_state *st,
+				     unsigned int fifo_set_size)
+{
+	int ret;
+
+	ret = adxl367_set_fifo_samples(st, st->fifo_watermark, fifo_set_size);
+	if (ret)
+		return ret;
+
+	st->fifo_set_size = fifo_set_size;
+
+	return 0;
+}
+
+static int adxl367_set_fifo_watermark(struct adxl367_state *st,
+				      unsigned int fifo_watermark)
+{
+	int ret;
+
+	ret = adxl367_set_fifo_samples(st, fifo_watermark, st->fifo_set_size);
+	if (ret)
+		return ret;
+
+	st->fifo_watermark = fifo_watermark;
+
+	return 0;
 }
 
 static int adxl367_set_range(struct adxl367_state *st,
@@ -1148,17 +1178,22 @@ static int adxl367_set_watermark(struct iio_dev *indio_dev, unsigned int val)
 	if (val > ADXL367_FIFO_MAX_WATERMARK)
 		return -EINVAL;
 
-	st->fifo_watermark = val;
+	mutex_lock(&st->lock);
 
 	ret = adxl367_set_measure_en(st, false);
 	if (ret)
-		return ret;
+		goto out;
 
-	ret = adxl367_update_fifo_samples(st);
+	ret = adxl367_set_fifo_watermark(st, val);
 	if (ret)
-		return ret;
+		goto out;
 
-	return adxl367_set_measure_en(st, true);
+	ret = adxl367_set_measure_en(st, true);
+
+out:
+	mutex_unlock(&st->lock);
+
+	return ret;
 }
 
 static int adxl367_find_mask_fifo_format(const unsigned long *scan_mask,
@@ -1203,27 +1238,34 @@ static int adxl367_update_scan_mode(struct iio_dev *indio_dev,
 {
 	struct adxl367_state *st  = iio_priv(indio_dev);
 	enum adxl367_fifo_format fifo_format;
+	unsigned int fifo_set_size;
 	int ret;
 
 	if (!adxl367_find_mask_fifo_format(active_scan_mask, &fifo_format))
 		return -EINVAL;
 
-	st->fifo_set_size = bitmap_weight(active_scan_mask,
-					  indio_dev->masklength);
+	fifo_set_size = bitmap_weight(active_scan_mask, indio_dev->masklength);
+
+	mutex_lock(&st->lock);
 
 	ret = adxl367_set_measure_en(st, false);
 	if (ret)
-		return ret;
+		goto out;
 
-	ret = adxl367_update_fifo_samples(st);
+	ret = adxl367_set_fifo_set_size(st, fifo_set_size);
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = adxl367_set_fifo_format(st, fifo_format);
 	if (ret)
-		return ret;
+		goto out;
 
-	return adxl367_set_measure_en(st, true);
+	ret = adxl367_set_measure_en(st, true);
+
+out:
+	mutex_unlock(&st->lock);
+
+	return ret;
 }
 
 static int adxl367_buffer_postenable(struct iio_dev *indio_dev)
