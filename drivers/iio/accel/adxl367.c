@@ -730,6 +730,7 @@ static int adxl367_set_adc_mode_en(struct adxl367_state *st,
 		return ret;
 
 	mutex_lock(&st->lock);
+
 	if (!en && st->adc_mode != adc_mode) {
 		ret = -EINVAL;
 		goto out;
