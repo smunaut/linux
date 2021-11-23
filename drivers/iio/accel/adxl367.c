@@ -495,7 +495,7 @@ static int adxl367_set_range(struct adxl367_state *st,
 out:
 	mutex_unlock(&st->lock);
 
-	return 0;
+	return ret;
 }
 
 static int adxl367_time_ms_to_samples(struct adxl367_state *st, unsigned int ms)
