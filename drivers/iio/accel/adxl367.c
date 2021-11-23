@@ -294,9 +294,9 @@ static void adxl367_scale_act_thresholds(struct adxl367_state *st,
 			      / adxl367_range_scale_factor_tbl[new_range];
 }
 
-static int adxl367_set_act_threshold(struct adxl367_state *st,
-				     enum adxl367_activity_type act,
-				     unsigned int threshold)
+static int _adxl367_set_act_threshold(struct adxl367_state *st,
+				      enum adxl367_activity_type act,
+				      unsigned int threshold)
 {
 	u8 reg = adxl367_threshold_h_reg_tbl[act];
 	struct reg_sequence reg_seq[] = {
@@ -311,15 +311,7 @@ static int adxl367_set_act_threshold(struct adxl367_state *st,
 	reg_seq[0].def = ADXL367_THRESH_VAL_TO_H(threshold);
 	reg_seq[1].def = ADXL367_THRESH_VAL_TO_L(threshold);
 
-	ret = adxl367_set_measure_en(st, false);
-	if (ret)
-		return ret;
-
 	ret = regmap_multi_reg_write(st->regmap, reg_seq, ARRAY_SIZE(reg_seq));
-	if (ret)
-		return ret;
-
-	ret = adxl367_set_measure_en(st, true);
 	if (ret)
 		return ret;
 
@@ -333,6 +325,32 @@ static int adxl367_set_act_threshold(struct adxl367_state *st,
 	}
 
 	return 0;
+}
+
+static int adxl367_set_act_threshold(struct adxl367_state *st,
+				     enum adxl367_activity_type act,
+				     unsigned int threshold)
+{
+	int ret;
+
+	mutex_lock(&st->lock);
+
+	ret = adxl367_set_measure_en(st, false);
+	if (ret)
+		goto out;
+
+	ret = _adxl367_set_act_threshold(st, act, threshold);
+	if (ret)
+		goto out;
+
+	ret = adxl367_set_measure_en(st, true);
+	if (ret)
+		goto out;
+
+out:
+	mutex_unlock(&st->lock);
+
+	return ret;
 }
 
 static int adxl367_set_act_proc_mode(struct adxl367_state *st,
