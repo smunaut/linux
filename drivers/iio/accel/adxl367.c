@@ -1360,6 +1360,9 @@ int adxl367_setup_irq(struct iio_dev *indio_dev, int irq)
 	struct adxl367_state *st = iio_priv(indio_dev);
 	int ret;
 
+	if (!irq)
+		return 0;
+
 	st->dready_trig = devm_iio_trigger_alloc(st->dev, "%s-dev%d",
 						 indio_dev->name,
 						 indio_dev->id);
@@ -1424,11 +1427,9 @@ int adxl367_probe(struct device *dev, const struct adxl367_ops *ops,
 
 	iio_buffer_set_attrs(indio_dev->buffer, adxl367_fifo_attributes);
 
-	if (irq) {
-		ret = adxl367_setup_irq(indio_dev, irq);
-		if (ret)
-			return ret;
-	}
+	ret = adxl367_setup_irq(indio_dev, irq);
+	if (ret)
+		return ret;
 
 	return devm_iio_device_register(dev, indio_dev);
 }
