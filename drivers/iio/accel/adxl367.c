@@ -344,8 +344,6 @@ static int adxl367_set_act_threshold(struct adxl367_state *st,
 		goto out;
 
 	ret = adxl367_set_measure_en(st, true);
-	if (ret)
-		goto out;
 
 out:
 	mutex_unlock(&st->lock);
