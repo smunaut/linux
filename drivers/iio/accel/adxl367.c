@@ -863,7 +863,7 @@ static irqreturn_t adxl367_trigger_handler(int irq, void  *p)
 
 	adxl367_push_event(indio_dev, iio_get_time_ns(indio_dev), status);
 
-	if (ADXL367_STATUS_IS_FIFO_FULL(status))
+	if (!ADXL367_STATUS_IS_FIFO_FULL(status))
 		goto out;
 
 	ret = st->ops->read_fifo(st->context, st->fifo_buf, fifo_entries);
