@@ -854,7 +854,8 @@ static irqreturn_t adxl367_trigger_handler(int irq, void  *p)
 	struct adxl367_state *st = iio_priv(indio_dev);
 	u16 fifo_entries;
 	u8 status;
-	int i, ret;
+	int ret;
+	int i;
 
 	ret = adxl367_get_status(st, &status, &fifo_entries);
 	if (ret)
