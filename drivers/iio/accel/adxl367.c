@@ -822,7 +822,7 @@ static int adxl367_get_status(struct adxl367_state *st, u8 *status,
 	if (ret)
 		return ret;
 
-	st->status_buf[1] &= ADXL367_FIFO_ENT_H_MASK;
+	st->status_buf[2] &= ADXL367_FIFO_ENT_H_MASK;
 
 	*status = st->status_buf[0];
 	*fifo_entries = get_unaligned_le16(&st->status_buf[1]);
