@@ -1270,9 +1270,6 @@ static bool adxl367_validate_scan_mask(struct iio_dev *indio_dev,
 {
 	struct adxl367_state *st  = iio_priv(indio_dev);
 
-	if (!adxl367_find_mask_fifo_format(scan_mask, NULL))
-		return false;
-
 	if ((*scan_mask & BIT(3))
 	    && st->adc_mode != ADXL367_ADC_MODE_TEMP)
 		return false;
