@@ -1268,13 +1268,16 @@ static bool adxl367_validate_scan_mask(struct iio_dev *indio_dev,
 				       const unsigned long *scan_mask)
 {
 	struct adxl367_state *st  = iio_priv(indio_dev);
+	enum adxl367_adc_mode mode;
 
-	if ((*scan_mask & BIT(3))
-	    && st->adc_mode != ADXL367_ADC_MODE_TEMP)
+	mutex_lock(&st->lock);
+	mode = st->adc_mode;
+	mutex_unlock(&st->lock);
+
+	if ((*scan_mask & BIT(3)) && mode != ADXL367_ADC_MODE_TEMP)
 		return false;
 
-	if ((*scan_mask & BIT(4))
-	    && st->adc_mode != ADXL367_ADC_MODE_EX)
+	if ((*scan_mask & BIT(4)) && mode != ADXL367_ADC_MODE_EX)
 		return false;
 
 	return true;
