@@ -1302,11 +1302,11 @@ static int adxl367_update_scan_mode(struct iio_dev *indio_dev,
 	if (ret)
 		goto out;
 
-	ret = adxl367_set_fifo_set_size(st, fifo_set_size);
+	ret = adxl367_set_fifo_format(st, fifo_format);
 	if (ret)
 		goto out;
 
-	ret = adxl367_set_fifo_format(st, fifo_format);
+	ret = adxl367_set_fifo_set_size(st, fifo_set_size);
 	if (ret)
 		goto out;
 
