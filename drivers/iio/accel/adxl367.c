@@ -1259,8 +1259,7 @@ static int adxl367_find_mask_fifo_format(const unsigned long *scan_mask,
 	if (i == size)
 		return false;
 
-	if (fifo_format)
-		*fifo_format = i;
+	*fifo_format = i;
 
 	return true;
 }
