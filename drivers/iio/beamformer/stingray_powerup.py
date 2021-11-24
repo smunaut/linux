@@ -4,7 +4,8 @@ import re
 from time import sleep
 
 class IIO:
-	_ip='10.48.65.107'
+	_ip='10.48.65.109'
+
 	def write_reg(self, dev_name, reg, val):
 		os.system('iio_reg -u ip:' + self._ip + ' ' + dev_name + ' ' + str(reg) + ' ' + str(val))
 
@@ -35,14 +36,47 @@ class IIO:
 class Ltc2992:
 	""" Class for Stingray board control. """
 	_dev_name='ltc2992'
-	
+	_gpio=0
+	def __init__(self):
+		self.export_gpios()
+
+	def export_gpios(self):
+		# devices = os.popen('grep "" /sys/class/gpio/gpiochip*/device/name').read
+		devices = os.popen('grep "" ~/adar1000/gpio/gpiochip*/device/name').read()
+		devices = devices.split(sep="\n")
+		for line in devices:
+			if self._dev_name in line:
+				device = line
+				break
+
+		device = device.split(sep="/")
+		for line in device:
+			if 'gpiochip' in line:
+				device = line
+				break
+		device = device.replace('gpiochip', '')
+		gpio = int(device, 10)
+		os.system('echo ' + str(gpio + 0) + ' > /sys/class/gpio/export')
+		os.system('echo ' + str(gpio + 1) + ' > /sys/class/gpio/export')
+		os.system('echo ' + str(gpio + 2) + ' > /sys/class/gpio/export')
+		os.system('echo ' + str(gpio + 3) + ' > /sys/class/gpio/export')
+		self._gpio = gpio
+
 	def power_sequencer_enable(self):
-		# return self._monitor.gpio1 todo
-		return 1
+		# value = os.popen('/sys/class/gpio/ltc2992-6a-GPIO1/value').read()
+		value = os.popen('grep "" ~/adar1000/gpio/ltc2992-6a-GPIO1/value').read()
+		if value == '':
+			return 0
+		val = int(value, 10)
+		return val == 0
 
 	def power_sequencer_power_good(self):
-		# return self._monitor.gpio1 todo
-		return 1
+		# value = os.popen('/sys/class/gpio/ltc2992-6a-GPIO3/value').read()
+		value = os.popen('grep "" ~/adar1000/gpio/ltc2992-6a-GPIO3/value').read()
+		if value == '':
+			return 0
+		val = int(value, 10)
+		return val == 0
 
 class GPIOS:
 	# take this values from dt stingray_control
@@ -51,7 +85,7 @@ class GPIOS:
 
 	def get_device(self, dev_label):
 		# value = os.popen('grep "" /sys/bus/iio/devices/iio\:device*/label').read()
-		devices = os.popen('grep "" ~/iio/iio\:device*/label').read()
+		devices = os.popen('grep "" ~/adar1000/iio/iio\:device*/label').read()
 		devices = devices.split(sep="\n")
 		for line in devices:
 			if dev_label in line:
@@ -66,8 +100,8 @@ class GPIOS:
 
 		return device
 
-	def gpio_pulse(self, ch):
-		iio = IIO()
+	def gpio_pulse(self, iio, ch):
+
 		device = self.get_device(dev_label='stingray_control')
 		iio.write_dev_ch_attr(dev_name = device, channel = 'voltage' + str(ch), attr = 'raw', val = 1)
 		iio.write_dev_ch_attr(dev_name = device, channel = 'voltage' + str(ch), attr = 'raw', val = 0)
@@ -77,6 +111,14 @@ class Stingray:
 	_revision = 'B'
 	_dev_name='adar1000_csb_1_1'
 	_POWER_DELAY = 0.2
+	_iio = 0
+	_ltc = 0
+	_gpio = 0
+
+	def __init__(self):
+		self._iio = IIO()
+		self._ltc = Ltc2992()
+		self._gpio = GPIOS()
 
 	# region Child Classes
 	class Adar1000:
@@ -115,28 +157,26 @@ class Stingray:
 		# endregion
 
 	def _pulse_power_pin(self, which):
-		gpio = GPIOS()
 		if which.lower() == 'pwr_up_down':
-			gpio.gpio_pulse(gpio.PWR_UP_DOWN_PIN)
+			self._gpio.gpio_pulse(self._iio, self._gpio.PWR_UP_DOWN_PIN)
 		elif which.lower() == '5v_ctrl':
-			gpio.gpio_pulse(gpio.P5V_CTRL_PIN)
+			self._gpio.gpio_pulse(self._iio, self._gpio.P5V_CTRL_PIN)
 		else:
 			raise ValueError(f"Can't pulse the {repr(which).upper()} pin")
 
 	def partially_powered(self):
 		""" Status of the board's power tree connected to the ADM1186 """
-		iio = IIO()
-		ltc = Ltc2992()
+
 		# If Rev.A, there's no way to check on the rails directly, we have to rely on SPI readback
 		if self._revision == 'A':
 			write_data = 0xA3
-			iio.write_reg(dev_name =self._dev_name, reg=self.Adar1000.SCRATCHPAD_REG,val=write_data)
-			return iio.read_reg(dev_name =self._dev_name, reg=self.Adar1000.SCRATCHPAD_REG) == write_data
+			self._iio.write_reg(dev_name =self._dev_name, reg=self.Adar1000.SCRATCHPAD_REG,val=write_data)
+			return self._iio.read_reg(dev_name =self._dev_name, reg=self.Adar1000.SCRATCHPAD_REG) == write_data
 			# self.devices[1]._write_spi(self.Adar1000.SCRATCHPAD_REG, write_data)
 			# return self.devices[1]._read_spi(self.Adar1000.SCRATCHPAD_REG) == write_data
 		else:
 			# If Rev.B, we can directly read the sequencer's EN and PG status.
-			return bool(ltc.power_sequencer_enable & ltc.power_sequencer_power_good)
+			return bool(self._ltc.power_sequencer_enable() & self._ltc.power_sequencer_power_good())
 
 	def initialize_devices(self, pa_off=-2.5, pa_on=-2.5, lna_off=-2, lna_on=-2):
 		""" Initialize the devices to allow for safe powerup of the board
@@ -173,7 +213,7 @@ class Stingray:
 			sleep(self._POWER_DELAY)
 		else:
 			loops = 0
-			while not self.power_sequencer_power_good:
+			while not self._ltc.power_sequencer_power_good():
 				sleep(0.01)
 				loops += 1
 
