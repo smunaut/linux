@@ -66,7 +66,7 @@ class Ltc2992:
 		# value = os.popen('/sys/class/gpio/ltc2992-6a-GPIO1/value').read()
 		value = os.popen('grep "" ~/adar1000/gpio/ltc2992-6a-GPIO1/value').read()
 		if value == '':
-			return 0
+			return 1
 		val = int(value, 10)
 		return val == 0
 
@@ -74,7 +74,7 @@ class Ltc2992:
 		# value = os.popen('/sys/class/gpio/ltc2992-6a-GPIO3/value').read()
 		value = os.popen('grep "" ~/adar1000/gpio/ltc2992-6a-GPIO3/value').read()
 		if value == '':
-			return 0
+			return 1
 		val = int(value, 10)
 		return val == 0
 
@@ -111,19 +111,26 @@ class Stingray:
 	_revision = 'B'
 	_dev_name='adar1000_csb_1_1'
 	_POWER_DELAY = 0.2
-	_iio = 0
-	_ltc = 0
-	_gpio = 0
+	# _iio = 0
+	# _ltc = 0
+	# _gpio = 0
+	_devices = list()
 
 	def __init__(self):
 		self._iio = IIO()
 		self._ltc = Ltc2992()
 		self._gpio = GPIOS()
+		# Handles for the ADAR and ADTR chips
+		# self._devices = list()
 
 	# region Child Classes
 	class Adar1000:
-		def dummy(self):
-			print("dummy")
+		_channels = 4
+		def __init__(self, name):
+			self._name = name
+
+		def initialize(self, pa_off=-2.5, pa_on=-2.5, lna_off=-2, lna_on=-2):
+			print('asd')	
 
 		# region Registers
 		INTERFACE_CONFIG_A_REG = 0x0000
@@ -156,6 +163,7 @@ class Stingray:
 		TX_BIAS_RAM_CTL_REG = 0x0052
 		# endregion
 
+
 	def _pulse_power_pin(self, which):
 		if which.lower() == 'pwr_up_down':
 			self._gpio.gpio_pulse(self._iio, self._gpio.PWR_UP_DOWN_PIN)
@@ -178,6 +186,22 @@ class Stingray:
 			# If Rev.B, we can directly read the sequencer's EN and PG status.
 			return bool(self._ltc.power_sequencer_enable() & self._ltc.power_sequencer_power_good())
 
+	def get_devices(self):
+		# value = os.popen('grep "" /sys/bus/iio/devices/iio\:device*/label').read()
+		devices = os.popen('grep "" ~/adar1000/iio/iio\:device*/name').read()
+		devices = devices.split(sep="\n")
+		for line in devices:
+			if 'adar1000' in line:
+				device = line
+				device = device.split(sep="/")
+				for line in device:
+					if 'iio:device' in line:
+						a = self.Adar1000(line)
+						self._devices.append(a)
+
+	# def initialize(self, pa_off=-2.5, pa_on=-2.5, lna_off=-2, lna_on=-2):
+	# 	for channel in self.channels:
+
 	def initialize_devices(self, pa_off=-2.5, pa_on=-2.5, lna_off=-2, lna_on=-2):
 		""" Initialize the devices to allow for safe powerup of the board
 
@@ -188,7 +212,8 @@ class Stingray:
 			lna_on (float): Voltage to set the LNA_BIAS_ON values to during initialization
 		"""
 
-		for adar in self.devices.values():
+		for adar in self._devices:
+			print('d')
 			adar.initialize(pa_off, pa_on, lna_off, lna_on)
 
 	def powerup(self, enable_5v=True, **kwargs):
@@ -219,6 +244,7 @@ class Stingray:
 
 				if loops > 50:
 					raise SystemError("Power sequencer PG pin never went high, something's wrong")
+		self.get_devices()
 		# Initialize all the ADAR1000s
 		self.initialize_devices(pa_off=pa_off, pa_on=pa_on, lna_off=lna_off, lna_on=lna_on)
 
