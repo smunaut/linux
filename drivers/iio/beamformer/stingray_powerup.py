@@ -1,11 +1,12 @@
 import os
-import subprocess
-import re
+#import subprocess
+#import re
 from time import sleep
+import string
 
 class IIO:
-	_ip='10.48.65.111'
-	# _ip='localhost'
+	# _ip='10.48.65.111'
+	_ip='localhost'
 
 	def write_reg(self, dev_name, reg, val):
 		value = os.popen('iio_reg -u ip:' + self._ip + ' ' + dev_name + ' ' + str(reg) + ' ' + str(val)).read()
@@ -44,15 +45,16 @@ class IIO:
 		return int(value, 10)
 
 class Ltc2992:
-	""" Class for Stingray board control. """
 	_dev_name='ltc2992'
-	_gpio=0
+	_gpio_name=''
+
 	def __init__(self):
 		self.export_gpios()
+		self.get_gpio()
 
 	def export_gpios(self):
-		# devices = os.popen('grep "" /sys/class/gpio/gpiochip*/device/name').read
-		devices = os.popen('grep "" ~/adar1000/gpio/gpiochip*/device/name').read()
+		devices = os.popen('grep "" /sys/class/gpio/gpiochip*/device/name').read()
+		# devices = os.popen('grep "" ~/adar1000/gpio/gpiochip*/device/name').read()
 		devices = devices.split(sep="\n")
 		for line in devices:
 			if self._dev_name in line:
@@ -64,54 +66,70 @@ class Ltc2992:
 			if 'gpiochip' in line:
 				device = line
 				break
+
 		device = device.replace('gpiochip', '')
 		gpio = int(device, 10)
 		os.system('echo ' + str(gpio + 0) + ' > /sys/class/gpio/export')
 		os.system('echo ' + str(gpio + 1) + ' > /sys/class/gpio/export')
 		os.system('echo ' + str(gpio + 2) + ' > /sys/class/gpio/export')
 		os.system('echo ' + str(gpio + 3) + ' > /sys/class/gpio/export')
-		self._gpio = gpio
+
+	def get_gpio(self):
+		device = ''
+		devices = os.popen('ls /sys/class/gpio').read()
+		# devices = os.popen('ls ~/adar1000/gpio').read()
+		devices = devices.split(sep="\n")
+		for line in devices:
+			if (self._dev_name in line) & ('GPIO1' in line):
+				device = line
+				break
+
+		device = device.replace('GPIO1', 'GPIO')
+		self._gpio_name = device
 
 	def power_sequencer_enable(self):
-		# value = os.popen('/sys/class/gpio/ltc2992-6a-GPIO1/value').read()
-		value = os.popen('grep "" ~/adar1000/gpio/ltc2992-6a-GPIO1/value').read()
+		value = os.popen('cat /sys/class/gpio/' + self._gpio_name + '1/value').read()
+		# value = os.popen('grep "" ~/adar1000/gpio/' + self._gpio_name + '1/value').read()
 		if value == '':
 			return 0
 		val = int(value, 10)
+		print('GPIO1: power_sequencer_enable: ' + value)
 		return val == 0
 
 	def p5v_enable(self):
-		# value = os.popen('/sys/class/gpio/ltc2992-6a-GPIO2/value').read()
-		value = os.popen('grep "" ~/adar1000/gpio/ltc2992-6a-GPIO2/value').read()
+		value = os.popen('cat /sys/class/gpio/' + self._gpio_name + '2/value').read()
+		# value = os.popen('grep "" ~/adar1000/gpio/' + self._gpio_name + '2/value').read()
 		if value == '':
 			return 0
 		val = int(value, 10)
+		print('GPIO2: p5v_enable: ' + value)
 		return val == 0
 
 	def power_sequencer_power_good(self):
-		# value = os.popen('/sys/class/gpio/ltc2992-6a-GPIO3/value').read()
-		value = os.popen('grep "" ~/adar1000/gpio/ltc2992-6a-GPIO3/value').read()
+		value = os.popen('cat /sys/class/gpio/' + self._gpio_name + '3/value').read()
+		# value = os.popen('grep "" ~/adar1000/gpio/' + self._gpio_name + '3/value').read()
 		if value == '':
 			return 0
 		val = int(value, 10)
+		print('GPIO3: power_sequencer_power_good: ' + value)
 		return val == 0
 
 	def p5v_power_good(self):
-		# value = os.popen('/sys/class/gpio/ltc2992-6a-GPIO2/value').read()
-		value = os.popen('grep "" ~/adar1000/gpio/ltc2992-6a-GPIO4/value').read()
+		value = os.popen('cat /sys/class/gpio/' + self._gpio_name + '4/value').read()
+		# value = os.popen('grep "" ~/adar1000/gpio/' + self._gpio_name + '4/value').read()
 		if value == '':
 			return 0
 		val = int(value, 10)
+		print('GPIO4: p5v_power_good: ' + value)
 		return val == 0
 
 class GPIOS:
-	# take this values from dt stingray_control
 	P5V_CTRL_PIN = 4
 	PWR_UP_DOWN_PIN = 5
 
 	def get_device(self, dev_label):
-		# value = os.popen('grep "" /sys/bus/iio/devices/iio\:device*/label').read()
-		devices = os.popen('grep "" ~/adar1000/iio/iio\:device*/label').read()
+		devices = os.popen('grep "" /sys/bus/iio/devices/iio\:device*/label').read()
+		# devices = os.popen('grep "" ~/adar1000/iio/iio\:device*/label').read()
 		devices = devices.split(sep="\n")
 		for line in devices:
 			if dev_label in line:
@@ -179,15 +197,15 @@ class Stingray:
 		elif which.lower() == '5v_ctrl':
 			self._gpio.gpio_pulse(self._iio, self._gpio.P5V_CTRL_PIN)
 		else:
-			raise ValueError(f"Can't pulse the {repr(which).upper()} pin")
+			raise ValueError("Can't pulse the pin:" + which.lower())
 
 	def partially_powered(self):
 		""" Status of the board's power tree connected to the ADM1186 """
 
 		# If Rev.A, there's no way to check on the rails directly, we have to rely on SPI readback
 		if self._revision == 'A':
-			# devices = os.popen('grep "" /sys/bus/iio/devices/iio\:device*/label').read()
-			devices = os.popen('grep "" ~/adar1000/iio/iio\:device*/name').read()
+			devices = os.popen('grep "" /sys/bus/iio/devices/iio\:device*/name').read()
+			# devices = os.popen('grep "" ~/adar1000/iio/iio\:device*/name').read()
 			devices = devices.split(sep="\n")
 			for line in devices:
 				if 'adar1000' in line:
@@ -210,8 +228,8 @@ class Stingray:
 			return bool(self.partially_powered() & self._ltc.p5v_enable() & self._ltc.p5v_power_good())
 
 	def get_devices(self):
-		# devices = os.popen('grep "" /sys/bus/iio/devices/iio\:device*/label').read()
-		devices = os.popen('grep "" ~/adar1000/iio/iio\:device*/name').read()
+		devices = os.popen('grep "" /sys/bus/iio/devices/iio\:device*/name').read()
+		# devices = os.popen('grep "" ~/adar1000/iio/iio\:device*/name').read()
 		devices = devices.split(sep="\n")
 		for line in devices:
 			if 'adar1000' in line:
@@ -250,6 +268,7 @@ class Stingray:
 
 		# If the board is powered down
 		if not self.partially_powered():
+			print("Partial POWER UP: pulse pwr_up_down")
 			self.pulse_power_pin('pwr_up_down')
 		
 			# Wait for supplies to settle
@@ -265,41 +284,31 @@ class Stingray:
 						raise SystemError("Power sequencer PG pin never went high, something's wrong")
 			# todo Reload driver
 
-			self.get_devices()
-			if len(self._devices) == 0:
-				raise SystemError("No ADAR1000 devices found")
-
-			# Initialize all the ADAR1000s
-			self.initialize_devices(pa_off=pa_off, pa_on=pa_on, lna_off=lna_off, lna_on=lna_on)
-
 			if not self.partially_powered:
 				raise SystemError("Board didn't power up!")
 
+		self.get_devices()
+		if len(self._devices) == 0:
+			raise SystemError("No ADAR1000 devices found")
+		else:
+			print('Found ' + str(len(self._devices)) + ' ADAR1000 devices')
+
+		# Initialize all the ADAR1000s
+		self.initialize_devices(pa_off=pa_off, pa_on=pa_on, lna_off=lna_off, lna_on=lna_on)
+
 		# Send a signal to power up the +5V rail
 		if enable_5v and not self.fully_powered():
-			print("POWER UP: pulse_power_pin")
-			# self.pulse_power_pin('5v_ctrl')
+			print("POWER UP: pulse 5v_ctrl")
+			self.pulse_power_pin('5v_ctrl')
+			if not self.fully_powered():
+				print("POWER UP: failed")
+				# self.pulse_power_pin('5v_ctrl')
 
 		if not enable_5v and self.fully_powered():
 			print("POWER DOWN: _pulse_power_pin")
 			# self.pulse_power_pin('5v_ctrl')
 
 if __name__ == '__main__':
+	print('------Stingray power up script-------')
 	stingray = Stingray()
-	stingray.powerup(enable_5v=False)
-
-# Here’s an updated Power on Sequence with aforementioned GPIO monitoring that we use in our Python code
-# •	Enable +12VDC 
-# •	Read AND(Power_Sequencer_Enable, Power_Sequencer_Power_Good)
-# 	o	If False: Pulse the PWR_UP_DOWN signal to sequence the first RF Power Rails (gpio_pwr_up_down)
-# 			ADAR1000s fully powered
-# 			ADTR1107 partially powered
-# •	Read AND(Power_Sequencer_Enable, Power_Sequencer_Power_Good) again
-# 	o	If False: Something wrong with hardware
-# •	Initialize ADAR1000 to pinch off gate of ADTR1107
-# 	o	ADAR1000 Register writes to set PA_BIAS to -2.5V and LNA_BIAS to -2.0V
-# •	Read AND(Power_Sequencer_Enable, Power_Sequencer_Power_Good, p5v_power_good)
-# 	o	If False: Pulse +5V_CTRL_IN to Apply +5V rail (gpio_5v_ctrl)
-# 			ADTR1107 fully powered
-# •	Read AND(Power_Sequencer_Enable, Power_Sequencer_Power_Good, p5v_power_good) again
-# 	o	If False: Something wrong with hardware
+	stingray.powerup(enable_5v=True)
