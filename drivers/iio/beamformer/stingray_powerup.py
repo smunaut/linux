@@ -5,9 +5,13 @@ from time import sleep
 
 class IIO:
 	_ip='10.48.65.111'
+	# _ip='localhost'
 
 	def write_reg(self, dev_name, reg, val):
-		os.system('iio_reg -u ip:' + self._ip + ' ' + dev_name + ' ' + str(reg) + ' ' + str(val))
+		value = os.popen('iio_reg -u ip:' + self._ip + ' ' + dev_name + ' ' + str(reg) + ' ' + str(val)).read()
+		if value == '':
+			return ''
+		return int(value, 16)
 
 	def read_reg(self, dev_name, reg):
 		value = os.popen('iio_reg -u ip:' + self._ip + ' ' + dev_name + ' ' + str(reg)).read()
@@ -16,22 +20,28 @@ class IIO:
 		return int(value, 16)
 
 	def write_dev_attr(self, dev_name, attr, val):
-		os.system('iio_attr -u ip:' + self._ip + ' -d ' + dev_name + ' ' + str(attr) + ' ' + str(val))
+		value = os.popen('iio_attr -u ip:' + self._ip + ' -d ' + dev_name + ' ' + str(attr) + ' ' + str(val)).read()
+		if value == '':
+			return ''
+		return int(value, 10)
 
 	def read_dev_attr(self, dev_name, attr):
 		value = os.popen('iio_attr -u ip:' + self._ip + ' -d ' + dev_name + ' ' + str(attr)).read()
 		if value == '':
 			return ''
-		return int(value, 16)
+		return int(value, 10)
 
 	def write_dev_ch_attr(self, dev_name, channel, attr, val):
-		os.system('iio_attr -u ip:' + self._ip + ' -c ' + dev_name + ' ' + str(channel) + ' ' + str(attr) + ' ' + str(val))
+		value = os.popen('iio_attr -u ip:' + self._ip + ' -c ' + dev_name + ' ' + str(channel) + ' ' + str(attr) + ' ' + str(val)).read()
+		if value == '':
+			return ''
+		return int(value, 10)
 
 	def read_dev_ch_attr(self, dev_name, channel, attr, val):
 		value = os.popen('iio_attr -u ip:' + self._ip + ' -c ' + dev_name + ' ' + str(channel) + ' ' + str(attr)).read()
 		if value == '':
 			return ''
-		return int(value, 16)
+		return int(value, 10)
 
 class Ltc2992:
 	""" Class for Stingray board control. """
@@ -66,7 +76,15 @@ class Ltc2992:
 		# value = os.popen('/sys/class/gpio/ltc2992-6a-GPIO1/value').read()
 		value = os.popen('grep "" ~/adar1000/gpio/ltc2992-6a-GPIO1/value').read()
 		if value == '':
-			return 1
+			return 0
+		val = int(value, 10)
+		return val == 0
+
+	def p5v_enable(self):
+		# value = os.popen('/sys/class/gpio/ltc2992-6a-GPIO2/value').read()
+		value = os.popen('grep "" ~/adar1000/gpio/ltc2992-6a-GPIO2/value').read()
+		if value == '':
+			return 0
 		val = int(value, 10)
 		return val == 0
 
@@ -74,7 +92,15 @@ class Ltc2992:
 		# value = os.popen('/sys/class/gpio/ltc2992-6a-GPIO3/value').read()
 		value = os.popen('grep "" ~/adar1000/gpio/ltc2992-6a-GPIO3/value').read()
 		if value == '':
-			return 1
+			return 0
+		val = int(value, 10)
+		return val == 0
+
+	def p5v_power_good(self):
+		# value = os.popen('/sys/class/gpio/ltc2992-6a-GPIO2/value').read()
+		value = os.popen('grep "" ~/adar1000/gpio/ltc2992-6a-GPIO4/value').read()
+		if value == '':
+			return 0
 		val = int(value, 10)
 		return val == 0
 
@@ -109,21 +135,15 @@ class GPIOS:
 class Stingray:
 	""" Class for Stingray board control. """
 	_revision = 'B'
-	_dev_name='adar1000_csb_1_1'
 	_POWER_DELAY = 0.2
-	# _iio = 0
-	# _ltc = 0
-	# _gpio = 0
+	_fully_powered = False
 	_devices = list()
 
 	def __init__(self):
 		self._iio = IIO()
 		self._ltc = Ltc2992()
 		self._gpio = GPIOS()
-		# Handles for the ADAR and ADTR chips
-		# self._devices = list()
 
-	# region Child Classes
 	class Adar1000:
 		_channels = 4
 		_BIAS_CODE_TO_VOLTAGE_SCALE = -0.018824
@@ -132,44 +152,28 @@ class Stingray:
 
 		def initialize(self, iio, pa_off=-2.5, pa_on=-2.5, lna_off=-2, lna_on=-2):
 			dac_code = int(lna_on / self._BIAS_CODE_TO_VOLTAGE_SCALE)
-			iio.write_dev_attr(self._name, 'lna_bias_on', dac_code)
+			val = iio.write_dev_attr(self._name, 'lna_bias_on', dac_code)
+			if val != dac_code:
+				raise SystemError('Cant write device attribute')
+
 			dac_code = int(lna_off / self._BIAS_CODE_TO_VOLTAGE_SCALE)
-			iio.write_dev_attr(self._name, 'lna_bias_off', dac_code)
+			val = iio.write_dev_attr(self._name, 'lna_bias_off', dac_code)
+			if val != dac_code:
+				raise SystemError('Cant write device attribute')
 
+			dac_code = int(pa_on / self._BIAS_CODE_TO_VOLTAGE_SCALE)
+			for i in range(self._channels):
+				val = iio.write_dev_ch_attr(self._name, 'voltage' + str(i), 'pa_bias_on', dac_code)
+				if val != dac_code:
+					raise SystemError('Cant write device attribute')
 
-		# region Registers
-		INTERFACE_CONFIG_A_REG = 0x0000
-		SCRATCHPAD_REG = 0x000A
-		LD_WRK_REGS_REG = 0x0028# return self._monitor.gpio1 todo
-		TX_ENABLES_REG = 0x002F
-		MISC_ENABLES_REG = 0x0030
-		SW_CTRL_REG = 0x0031
-		ADC_CTRL_REG = 0x0032
-		ADC_OUTPUT_REG = 0x0033
-		BIAS_CURRENT_RX_LNA_REG = 0x0034
-		BIAS_CURRENT_RX_REG = 0x0035
-		BIAS_CURRENT_TX_REG = 0x0036
-		BIAS_CURRENT_TX_DRV_REG = 0x0037
-		MEM_CTRL_REG = 0x0038
-		RX_BEAM_COMMON_REG = 0x0039
-		TX_BEAM_COMMON_REG = 0x003A
-		PA1_BIAS_OFF_REG = 0x0046
-		PA2_BIAS_OFF_REG = 0x0047
-		PA3_BIAS_OFF_REG = 0x0048
-		PA4_BIAS_OFF_REG = 0x0049
-		LNA_BIAS_OFF_REG = 0x004A
-		TX_TO_RX_DELAY_REG = 0x004B
-		RX_TO_TX_DELAY_REG = 0x004C
-		TX_BEAM_STEP_START_REG = 0x004D
-		TX_BEAM_STEP_STOP_REG = 0x004E
-		RX_BEAM_STEP_START_REG = 0x004F
-		RX_BEAM_STEP_STOP_REG = 0x0050
-		RX_BIAS_RAM_CTL_REG = 0x0051
-		TX_BIAS_RAM_CTL_REG = 0x0052
-		# endregion
+			dac_code = int(pa_off / self._BIAS_CODE_TO_VOLTAGE_SCALE)
+			for i in range(self._channels):
+				val = iio.write_dev_ch_attr(self._name, 'voltage' + str(i), 'pa_bias_off', dac_code)
+				if val != dac_code:
+					raise SystemError('Cant write device attribute')
 
-
-	def _pulse_power_pin(self, which):
+	def pulse_power_pin(self, which):
 		if which.lower() == 'pwr_up_down':
 			self._gpio.gpio_pulse(self._iio, self._gpio.PWR_UP_DOWN_PIN)
 		elif which.lower() == '5v_ctrl':
@@ -182,17 +186,31 @@ class Stingray:
 
 		# If Rev.A, there's no way to check on the rails directly, we have to rely on SPI readback
 		if self._revision == 'A':
-			write_data = 0xA3
-			self._iio.write_reg(dev_name =self._dev_name, reg=self.Adar1000.SCRATCHPAD_REG,val=write_data)
-			return self._iio.read_reg(dev_name =self._dev_name, reg=self.Adar1000.SCRATCHPAD_REG) == write_data
-			# self.devices[1]._write_spi(self.Adar1000.SCRATCHPAD_REG, write_data)
-			# return self.devices[1]._read_spi(self.Adar1000.SCRATCHPAD_REG) == write_data
+			# devices = os.popen('grep "" /sys/bus/iio/devices/iio\:device*/label').read()
+			devices = os.popen('grep "" ~/adar1000/iio/iio\:device*/name').read()
+			devices = devices.split(sep="\n")
+			for line in devices:
+				if 'adar1000' in line:
+					return True
+
+			return False
 		else:
 			# If Rev.B, we can directly read the sequencer's EN and PG status.
 			return bool(self._ltc.power_sequencer_enable() & self._ltc.power_sequencer_power_good())
 
+	def fully_powered(self):
+		""" Status of the board's full power tree """
+
+		# If Rev.A, we have to rely on the flags
+		if self._revision == 'A':
+			return bool(self.partially_powered() & self._fully_powered)
+
+		# If Rev.B, we can directly read the EN and status signals.
+		else:
+			return bool(self.partially_powered() & self._ltc.p5v_enable() & self._ltc.p5v_power_good())
+
 	def get_devices(self):
-		# value = os.popen('grep "" /sys/bus/iio/devices/iio\:device*/label').read()
+		# devices = os.popen('grep "" /sys/bus/iio/devices/iio\:device*/label').read()
 		devices = os.popen('grep "" ~/adar1000/iio/iio\:device*/name').read()
 		devices = devices.split(sep="\n")
 		for line in devices:
@@ -203,9 +221,6 @@ class Stingray:
 					if 'iio:device' in line:
 						a = self.Adar1000(line)
 						self._devices.append(a)
-
-	# def initialize(self, pa_off=-2.5, pa_on=-2.5, lna_off=-2, lna_on=-2):
-	# 	for channel in self.channels:
 
 	def initialize_devices(self, pa_off=-2.5, pa_on=-2.5, lna_off=-2, lna_on=-2):
 		""" Initialize the devices to allow for safe powerup of the board
@@ -235,30 +250,43 @@ class Stingray:
 
 		# If the board is powered down
 		if not self.partially_powered():
-			self._pulse_power_pin('pwr_up_down')
+			self.pulse_power_pin('pwr_up_down')
 		
-		 # Wait for supplies to settle
-		if self._revision == 'A':
-			sleep(self._POWER_DELAY)
-		else:
-			loops = 0
-			while not self._ltc.power_sequencer_power_good():
-				sleep(0.01)
-				loops += 1
+			# Wait for supplies to settle
+			if self._revision == 'A':
+				sleep(self._POWER_DELAY)
+			else:
+				loops = 0
+				while not self._ltc.power_sequencer_power_good():
+					sleep(0.01)
+					loops += 1
 
-				if loops > 50:
-					raise SystemError("Power sequencer PG pin never went high, something's wrong")
-		self.get_devices()
-		# Initialize all the ADAR1000s
-		self.initialize_devices(pa_off=pa_off, pa_on=pa_on, lna_off=lna_off, lna_on=lna_on)
+					if loops > 50:
+						raise SystemError("Power sequencer PG pin never went high, something's wrong")
+			# todo Reload driver
 
-stingray = Stingray()
-stingray.powerup(enable_5v=False)
-# stingray.write_reg(reg='0x0A',val='0xea')
-# print(stingray.read_reg(reg='0x0A'))
+			self.get_devices()
+			if len(self._devices) == 0:
+				raise SystemError("No ADAR1000 devices found")
 
-# print(stingray.read_reg(reg=1))
+			# Initialize all the ADAR1000s
+			self.initialize_devices(pa_off=pa_off, pa_on=pa_on, lna_off=lna_off, lna_on=lna_on)
 
+			if not self.partially_powered:
+				raise SystemError("Board didn't power up!")
+
+		# Send a signal to power up the +5V rail
+		if enable_5v and not self.fully_powered():
+			print("POWER UP: pulse_power_pin")
+			# self.pulse_power_pin('5v_ctrl')
+
+		if not enable_5v and self.fully_powered():
+			print("POWER DOWN: _pulse_power_pin")
+			# self.pulse_power_pin('5v_ctrl')
+
+if __name__ == '__main__':
+	stingray = Stingray()
+	stingray.powerup(enable_5v=False)
 
 # Here’s an updated Power on Sequence with aforementioned GPIO monitoring that we use in our Python code
 # •	Enable +12VDC 
