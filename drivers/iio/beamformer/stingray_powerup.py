@@ -4,7 +4,7 @@ import re
 from time import sleep
 
 class IIO:
-	_ip='10.48.65.109'
+	_ip='10.48.65.111'
 
 	def write_reg(self, dev_name, reg, val):
 		os.system('iio_reg -u ip:' + self._ip + ' ' + dev_name + ' ' + str(reg) + ' ' + str(val))
@@ -126,11 +126,16 @@ class Stingray:
 	# region Child Classes
 	class Adar1000:
 		_channels = 4
+		_BIAS_CODE_TO_VOLTAGE_SCALE = -0.018824
 		def __init__(self, name):
 			self._name = name
 
-		def initialize(self, pa_off=-2.5, pa_on=-2.5, lna_off=-2, lna_on=-2):
-			print('asd')	
+		def initialize(self, iio, pa_off=-2.5, pa_on=-2.5, lna_off=-2, lna_on=-2):
+			dac_code = int(lna_on / self._BIAS_CODE_TO_VOLTAGE_SCALE)
+			iio.write_dev_attr(self._name, 'lna_bias_on', dac_code)
+			dac_code = int(lna_off / self._BIAS_CODE_TO_VOLTAGE_SCALE)
+			iio.write_dev_attr(self._name, 'lna_bias_off', dac_code)
+
 
 		# region Registers
 		INTERFACE_CONFIG_A_REG = 0x0000
@@ -213,8 +218,7 @@ class Stingray:
 		"""
 
 		for adar in self._devices:
-			print('d')
-			adar.initialize(pa_off, pa_on, lna_off, lna_on)
+			adar.initialize(self._iio, pa_off, pa_on, lna_off, lna_on)
 
 	def powerup(self, enable_5v=True, **kwargs):
 		""" Power up the Stingray.
