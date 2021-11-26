@@ -32,13 +32,16 @@ class IIO:
 			return ''
 		return int(value, 10)
 
-	def write_dev_ch_attr(self, dev_name, channel, attr, val):
-		value = os.popen('iio_attr -u ip:' + self._ip + ' -c ' + dev_name + ' ' + str(channel) + ' ' + str(attr) + ' ' + str(val)).read()
+	def write_dev_ch_attr(self, dev_name, channel, attr, val, dir = ''):
+		value = os.popen('iio_attr -u ip:' + self._ip + ' -c ' + dir + ' ' + dev_name + ' ' + str(channel) + ' ' + str(attr) + ' ' + str(val)).read()
 		if value == '':
 			return ''
-		return int(value, 10)
+		try:
+			return int(value, 10)
+		except ValueError:
+			return value
 
-	def read_dev_ch_attr(self, dev_name, channel, attr, val):
+	def read_dev_ch_attr(self, dev_name, channel, attr):
 		value = os.popen('iio_attr -u ip:' + self._ip + ' -c ' + dev_name + ' ' + str(channel) + ' ' + str(attr)).read()
 		if value == '':
 			return ''
@@ -165,10 +168,80 @@ class Stingray:
 	class Adar1000:
 		_channels = 4
 		_BIAS_CODE_TO_VOLTAGE_SCALE = -0.018824
+
+		INTERFACE_CONFIG_A_REG = 0x0000
+		SCRATCHPAD_REG = 0x000A
+		LD_WRK_REGS_REG = 0x0028
+		PA1_BIAS_ON_REG = 0x0029
+		PA2_BIAS_ON_REG = 0x002A
+		PA3_BIAS_ON_REG = 0x002B
+		PA4_BIAS_ON_REG = 0x002C
+		LNA_BIAS_ON_REG = 0x002D
+		RX_ENABLES_REG = 0x002E
+		TX_ENABLES_REG = 0x002F
+		MISC_ENABLES_REG = 0x0030
+		SW_CTRL_REG = 0x0031
+		ADC_CTRL_REG = 0x0032
+		ADC_OUTPUT_REG = 0x0033
+		BIAS_CURRENT_RX_LNA_REG = 0x0034
+		BIAS_CURRENT_RX_REG = 0x0035
+		BIAS_CURRENT_TX_REG = 0x0036
+		BIAS_CURRENT_TX_DRV_REG = 0x0037
+		MEM_CTRL_REG = 0x0038
+		RX_BEAM_COMMON_REG = 0x0039
+		TX_BEAM_COMMON_REG = 0x003A
+		PA1_BIAS_OFF_REG = 0x0046
+		PA2_BIAS_OFF_REG = 0x0047
+		PA3_BIAS_OFF_REG = 0x0048
+		PA4_BIAS_OFF_REG = 0x0049
+		LNA_BIAS_OFF_REG = 0x004A
+		TX_TO_RX_DELAY_REG = 0x004B
+		RX_TO_TX_DELAY_REG = 0x004C
+		TX_BEAM_STEP_START_REG = 0x004D
+		TX_BEAM_STEP_STOP_REG = 0x004E
+		RX_BEAM_STEP_START_REG = 0x004F
+		RX_BEAM_STEP_STOP_REG = 0x0050
+		RX_BIAS_RAM_CTL_REG = 0x0051
+		TX_BIAS_RAM_CTL_REG = 0x0052
+
 		def __init__(self, name):
 			self._name = name
 
 		def initialize(self, iio, pa_off=-2.5, pa_on=-2.5, lna_off=-2, lna_on=-2):
+
+			# Set the bias currents
+			iio.write_reg(self._name, self.BIAS_CURRENT_RX_LNA_REG, 0x08)
+			iio.write_reg(self._name, self.BIAS_CURRENT_RX_REG, 0x55)
+			iio.write_reg(self._name, self.BIAS_CURRENT_TX_REG, 0x2D)
+			iio.write_reg(self._name, self.BIAS_CURRENT_TX_DRV_REG, 0x06)
+
+			# Disable RAM control
+			iio.write_dev_attr(self._name, 'beam_mem_enable', 0)
+			iio.write_dev_attr(self._name, 'bias_mem_enable', 0)
+			iio.write_dev_attr(self._name, 'common_mem_enable', 0)
+
+			# Enable all internal amplifiers
+			iio.write_dev_attr(self._name, 'rx_vga_enable', 1)
+			iio.write_dev_attr(self._name, 'rx_vm_enable', 1)
+			iio.write_dev_attr(self._name, 'rx_lna_enable', 1)
+			iio.write_dev_attr(self._name, 'tx_vga_enable', 1)
+			iio.write_dev_attr(self._name, 'tx_vm_enable', 1)
+			iio.write_dev_attr(self._name, 'tx_drv_enable', 1)
+
+			# Disable Tx/Rx paths
+			iio.write_dev_attr(self._name, 'tx_en', 0)
+			iio.write_dev_attr(self._name, 'rx_en', 0)
+
+			# Enable the PA/LNA bias DACs
+			iio.write_dev_attr(self._name, 'bias_enable', 1)
+			iio.write_dev_attr(self._name, 'lna_bias_out_enable', 1)
+			iio.write_dev_attr(self._name, 'bias_ctrl', 1)
+
+			# Configure the external switch control
+			iio.write_dev_attr(self._name, 'sw_drv_tr_state', 1)
+			iio.write_dev_attr(self._name, 'sw_drv_en_tr', 1)
+
+			# Set the default LNA bias
 			dac_code = int(lna_on / self._BIAS_CODE_TO_VOLTAGE_SCALE)
 			val = iio.write_dev_attr(self._name, 'lna_bias_on', dac_code)
 			if val != dac_code:
@@ -179,17 +252,33 @@ class Stingray:
 			if val != dac_code:
 				raise SystemError('Cant write device attribute')
 
-			dac_code = int(pa_on / self._BIAS_CODE_TO_VOLTAGE_SCALE)
+			# Settings for each channel
 			for i in range(self._channels):
+				# Default channel enable
+				val = iio.write_dev_ch_attr(self._name, 'voltage' + str(i), 'powerdown', 1, '-i') #RX
+				if val != 1:
+					raise SystemError('Cant write device attribute')
+				val = iio.write_dev_ch_attr(self._name, 'voltage' + str(i), 'powerdown', 1, '-o') #TX
+				if val != 1:
+					raise SystemError('Cant write device attribute')
+
+				# Default PA bias
+				dac_code = int(pa_on / self._BIAS_CODE_TO_VOLTAGE_SCALE)
 				val = iio.write_dev_ch_attr(self._name, 'voltage' + str(i), 'pa_bias_on', dac_code)
 				if val != dac_code:
 					raise SystemError('Cant write device attribute')
 
-			dac_code = int(pa_off / self._BIAS_CODE_TO_VOLTAGE_SCALE)
-			for i in range(self._channels):
+				dac_code = int(pa_off / self._BIAS_CODE_TO_VOLTAGE_SCALE)
 				val = iio.write_dev_ch_attr(self._name, 'voltage' + str(i), 'pa_bias_off', dac_code)
 				if val != dac_code:
 					raise SystemError('Cant write device attribute')
+
+
+				iio.write_dev_ch_attr(self._name, 'voltage' + str(i), 'hardwaregain', 0x7f, '-i') #RX
+				val = iio.write_dev_ch_attr(self._name, 'voltage' + str(i), 'phase', 0, '-i') #RX
+
+				val = iio.write_dev_ch_attr(self._name, 'voltage' + str(i), 'hardwaregain', 0x7f, '-o') #TX
+				val = iio.write_dev_ch_attr(self._name, 'voltage' + str(i), 'phase', 0, '-o') #TX
 
 	def pulse_power_pin(self, which):
 		if which.lower() == 'pwr_up_down':
