@@ -1,4 +1,5 @@
 import os
+import sys
 #import subprocess
 #import re
 from time import sleep
@@ -96,7 +97,6 @@ class Ltc2992:
 		if value == '':
 			return 0
 		val = int(value, 10)
-		print('GPIO1: power_sequencer_enable: ' + value)
 		return val == 0
 
 	def p5v_enable(self):
@@ -105,7 +105,6 @@ class Ltc2992:
 		if value == '':
 			return 0
 		val = int(value, 10)
-		print('GPIO2: p5v_enable: ' + value)
 		return val == 0
 
 	def power_sequencer_power_good(self):
@@ -114,7 +113,6 @@ class Ltc2992:
 		if value == '':
 			return 0
 		val = int(value, 10)
-		print('GPIO3: power_sequencer_power_good: ' + value)
 		return val == 0
 
 	def p5v_power_good(self):
@@ -123,7 +121,6 @@ class Ltc2992:
 		if value == '':
 			return 0
 		val = int(value, 10)
-		print('GPIO4: p5v_power_good: ' + value)
 		return val == 0
 
 class GPIOS:
@@ -148,7 +145,6 @@ class GPIOS:
 		return device
 
 	def gpio_pulse(self, iio, ch):
-
 		device = self.get_device(dev_label='stingray_control')
 		iio.write_dev_ch_attr(dev_name = device, channel = 'voltage' + str(ch), attr = 'raw', val = 1)
 		iio.write_dev_ch_attr(dev_name = device, channel = 'voltage' + str(ch), attr = 'raw', val = 0)
@@ -231,6 +227,7 @@ class Stingray:
 			# Disable Tx/Rx paths
 			iio.write_dev_attr(self._name, 'tx_en', 0)
 			iio.write_dev_attr(self._name, 'rx_en', 0)
+			iio.write_dev_attr(self._name, 'tr_source', 0)
 
 			# Enable the PA/LNA bias DACs
 			iio.write_dev_attr(self._name, 'bias_enable', 1)
@@ -250,28 +247,28 @@ class Stingray:
 			dac_code = int(lna_off / self._BIAS_CODE_TO_VOLTAGE_SCALE)
 			val = iio.write_dev_attr(self._name, 'lna_bias_off', dac_code)
 			if val != dac_code:
-				raise SystemError('Cant write device attribute')
+				raise SystemError('Stingray power: Cant write device attribute')
 
 			# Settings for each channel
 			for i in range(self._channels):
 				# Default channel enable
 				val = iio.write_dev_ch_attr(self._name, 'voltage' + str(i), 'powerdown', 1, '-i') #RX
 				if val != 1:
-					raise SystemError('Cant write device attribute')
+					raise SystemError('Stingray power: Cant write device attribute')
 				val = iio.write_dev_ch_attr(self._name, 'voltage' + str(i), 'powerdown', 1, '-o') #TX
 				if val != 1:
-					raise SystemError('Cant write device attribute')
+					raise SystemError('Stingray power: Cant write device attribute')
 
 				# Default PA bias
 				dac_code = int(pa_on / self._BIAS_CODE_TO_VOLTAGE_SCALE)
 				val = iio.write_dev_ch_attr(self._name, 'voltage' + str(i), 'pa_bias_on', dac_code)
 				if val != dac_code:
-					raise SystemError('Cant write device attribute')
+					raise SystemError('Stingray power: Cant write device attribute')
 
 				dac_code = int(pa_off / self._BIAS_CODE_TO_VOLTAGE_SCALE)
 				val = iio.write_dev_ch_attr(self._name, 'voltage' + str(i), 'pa_bias_off', dac_code)
 				if val != dac_code:
-					raise SystemError('Cant write device attribute')
+					raise SystemError('Stingray power: Cant write device attribute')
 
 
 				iio.write_dev_ch_attr(self._name, 'voltage' + str(i), 'hardwaregain', 0x7f, '-i') #RX
@@ -338,17 +335,52 @@ class Stingray:
 			lna_off (float): Voltage to set the LNA_BIAS_OFF values to during initialization
 			lna_on (float): Voltage to set the LNA_BIAS_ON values to during initialization
 		"""
-
 		for adar in self._devices:
 			adar.initialize(self._iio, pa_off, pa_on, lna_off, lna_on)
 
+	def powerdown(self):
+		self.get_devices()
+		print('Stingray power: Found ' + str(len(self._devices)) + ' ADAR1000 devices')
+
+		# If the +5V rail is up
+		if self.fully_powered():
+			# Turn on a single PA to help bring this down faster
+			self._iio.write_dev_attr(self._devices[1]._name, 'rx_en', 0)
+			self._iio.write_dev_attr(self._devices[1]._name, 'tr_source', 0)
+			self._iio.write_dev_attr(self._devices[1]._name, 'tx_en', 1)
+
+			dac_code = int(-1.1 / self._devices[1]._BIAS_CODE_TO_VOLTAGE_SCALE)
+			self._iio.write_dev_ch_attr(self._devices[1]._name, 'voltage' + str(0), 'pa_bias_on', dac_code)
+
+			# Send a signal to power down the +5V rail
+			self.pulse_power_pin('5v_ctrl')
+			# Wait for the +5V rail to come down
+			if self._revision == 'A':
+				sleep(self._POWER_DELAY / 4)
+			else:
+				while self.fully_powered() > 0.5:
+					sleep(0.01)
+		else:
+			print("Stingray power: Board not powered")
+
+		# If the board is partially powered up
+		if self.partially_powered():
+			# Turn on a single cell's LNAs to help bring this down faster
+			self._iio.write_dev_attr(self._devices[1]._name, 'lna_bias_out_enable', 0)
+
+			# Send a signal to power down the Stingray board's sequenced rails
+			self.pulse_power_pin('pwr_up_down')
+
+			# Wait for the rest of the rails to come down
+			if self._revision == 'A':
+				sleep(self._POWER_DELAY)
+			else:
+				while self.partially_powered():
+					sleep(0.01)
+
+			print("Stingray power: Power down sequence succeeded")
+
 	def powerup(self, enable_5v=True, **kwargs):
-		""" Power up the Stingray.
-
-		Args:
-			enable_5v (bool): Boolean to set whether or not to enable the +5V rail.
-		"""
-
 		# Get any keywords that were given
 		pa_off = kwargs.get('pa_off', -2.5)
 		pa_on = kwargs.get('pa_on', -2.5)
@@ -357,7 +389,6 @@ class Stingray:
 
 		# If the board is powered down
 		if not self.partially_powered():
-			print("Partial POWER UP: pulse pwr_up_down")
 			self.pulse_power_pin('pwr_up_down')
 		
 			# Wait for supplies to settle
@@ -370,34 +401,40 @@ class Stingray:
 					loops += 1
 
 					if loops > 50:
-						raise SystemError("Power sequencer PG pin never went high, something's wrong")
+						raise SystemError("Stingray power: Power sequencer PG pin never went high, something's wrong")
 			# todo Reload driver
 
 			if not self.partially_powered:
-				raise SystemError("Board didn't power up!")
+				raise SystemError("Stingray power: Board didn't power up!")
 
 		self.get_devices()
 		if len(self._devices) == 0:
-			raise SystemError("No ADAR1000 devices found")
+			raise SystemError("Stingray power: No ADAR1000 devices found")
 		else:
-			print('Found ' + str(len(self._devices)) + ' ADAR1000 devices')
+			print('Stingray power: Found ' + str(len(self._devices)) + ' ADAR1000 devices')
 
 		# Initialize all the ADAR1000s
 		self.initialize_devices(pa_off=pa_off, pa_on=pa_on, lna_off=lna_off, lna_on=lna_on)
 
 		# Send a signal to power up the +5V rail
 		if enable_5v and not self.fully_powered():
-			print("POWER UP: pulse 5v_ctrl")
 			self.pulse_power_pin('5v_ctrl')
 			if not self.fully_powered():
-				print("POWER UP: failed")
-				# self.pulse_power_pin('5v_ctrl')
-
-		if not enable_5v and self.fully_powered():
-			print("POWER DOWN: _pulse_power_pin")
-			# self.pulse_power_pin('5v_ctrl')
+				print("Stingray power: Power up sequence failed")
+			else:
+				print("Stingray power: Power up sequence succeeded")
 
 if __name__ == '__main__':
-	print('------Stingray power up script-------')
-	stingray = Stingray()
-	stingray.powerup(enable_5v=True)
+	try:
+		if sys.argv[1] == 'up':
+			print("Stingray power: Start power up sequence")
+			stingray = Stingray()
+			stingray.powerup(enable_5v=True)
+		elif sys.argv[1] == 'down':
+			print("Stingray power: Start power down sequence")
+			stingray = Stingray()
+			stingray.powerdown()
+		else:
+			print('Stingray power: Please specify "up" or "down" option')
+	except IndexError:
+		print('Stingray power: Please specify "up" or "down" option')
